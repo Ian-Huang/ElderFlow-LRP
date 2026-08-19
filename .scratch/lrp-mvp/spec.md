@@ -34,11 +34,11 @@
 
 ### 住民基本資料管理 (CRUD)
 
-1. As a **機構行政/主任**, I want to **建立住民基本資料 (姓名、性別、生日、地址、保險ID、診斷、入住日期、狀態、特殊需求、緊急聯絡人)**, so that **建立完整住民檔案供後續照護參考**.
-2. As a **主任護理師/社工師**, I want to **編輯住民基本資料**, so that **異動住民狀態、診斷、特殊需求等資訊**.
-3. As a **照護員/護理員**, I want to **查詢住民基本資料 (含特殊需求標籤、三管狀態)**, so that **正確執行照護活動與藥物給藥**.
-4. As a **機構行政/主任**, I want to **停用/刪除住民資料 (軟刪除，保留歷史)**, so that **處理出院/轉院情況且不遺失歷史記錄**.
-5. As a **系統使用者**, I want to **依關鍵屬性 (入住日期、狀態、特殊需求、三管) 搜尋與篩選住民**, so that **快速定位特定住民記錄**.
+1. As a **機構行政/主任**, I want to **建立住民基本資料 (姓名、性別、生日、身分證字號、通訊地址、戶籍地址、住民編號、床位、管路、入住日期、緊急聯絡人完整資訊、身份別、依賴程度、身心障礙、重大傷病、教育程度、宗教信仰、工作史、主要診斷)**, so that **建立完整住民檔案供後續照護參考，符合評鑑與法規需求**.
+2. As a **主任護理師/社工師**, I want to **編輯住民基本資料 (含管路異動、床位調整、依賴程度變更、身份別更新)**, so that **即時反映住民狀態變化，自動觸發護理比例重算 (BR004)**.
+3. As a **照護員/護理員**, I want to **查詢住民基本資料 (含管路清單、三管狀態、床位、緊急聯絡人、身份別、依賴程度、身心障礙、重大傷病)**, so that **正確執行照護活動、藥物給藥與緊急聯絡**.
+4. As a **機構行政/主任**, I want to **停用住民資料 (軟刪除，保留住民編號與所有歷史記錄，床位釋放)**, so that **處理出院/轉院/離世情況且不遺失歷史記錄，住民編號永不重用**.
+5. As a **系統使用者**, I want to **依關鍵屬性 (入住日期、狀態、管路/三管、床位、身份別、依賴程度) 搜尋與篩選住民**, so that **快速定位特定住民記錄**.
 
 ### 日常照護記錄 (核心)
 
@@ -71,24 +71,28 @@
 
 ### 報表功能
 
-26. As a **主任護理師/社工師**, I want to **生成每日照護完成度報告**, so that **監控員工產能與照護品質'.
-27. As a **機構行政/主任**, I want to **查看住民狀態概覽 (含三管狀態、異常事件、用藥提醒)', so that **掌握整體健康與照護需求**.
-28. As a **系統使用者**, I want to **接收異常事件即時警示 (藥物錯誤、生命徵象異常、跌倒等)', so that **及時回應住民安全風險 (US43)**.
-29. As a **機構行政/主任**, I want to **匯出報表為 PDF 格式', so that **向不使用該系統的相關方分享資訊 (US37)**.
-30. As a **系統管理員**, I want to **查看完整稽核軌跡 (操作人、時間、舊值、新值、原因)', so that **滿足 5 年保存要求 (BR007)**.
+26. As a **主任護理師/社工師**, I want to **生成每日照護完成度報告**, so that **監控員工產能與照護品質**.
+27. As a **機構行政/主任**, I want to **查看住民狀態概覽 (含管路/三管狀態、床位分佈、異常事件、用藥提醒、身份別統計、依賴程度分佈)**, so that **掌握整體健康與照護需求，支援評鑑準備**.
+28. As a **系統使用者**, I want to **接收異常事件即時警示 (藥物錯誤、生命徵象異常、跌倒等)**, so that **及時回應住民安全風險**.
+29. As a **機構行政/主任**, I want to **匯出報表為 PDF 格式 (含住民名冊、管路統計、床位圖、完成度報表)**, so that **向不使用該系統的相關方分享資訊、配合評鑑佐證**.
+30. As a **系統管理員**, I want to **查看完整稽核軌跡 (操作人、時間、舊值、新值、原因)**, so that **滿足 5 年保存要求 (BR007)**.
+
+### 資料匯入 (一次性/定期)
+
+31. As a **機構行政/主任**, I want to **匯入住民資料 (JSON/CSV/Excel)，自動轉換民國年、管路解析、三管判斷、床位衝突檢查**, so that **首次上線與定期同步外部名冊無須手工逐筆建檔**.
 
 ### 系統管理與合規
 
-31. As a **系統管理員**, I want to **管理使用者帳號與角色指派', so that **確保基於角色的存取控制 (US30, US44, BR010)**.
-32. As a **系統管理員**, I want to **系統強制 24 小時記錄鎖定與電子簽章欄位', so that **保持資料完整性並符合法律要求 (BR001, BR002)**.
-33. As a **系統管理員', I want to **新住民合約簽署功能在 3 天審閱期結束前自動鎖定', so that **符合消保法規定 (BR006)**.
-34. As a **系統管理員', I want to **系統根據住民「三管」狀態動態計算護理人力比例 (一般 1:20、三管 1:15)', so that **優化人力配置 (BR004)**.
-35. As a **系統管理員', I want to **系統強制夜班 (22:00-08:00) 至少有一名本國籍員工在崗', so that **滿足監管要求 (BR003)**.
-36. As a **系統管理員', I want to **系統自動統計並報告特約社工每週工作時數 (最低 16 小時/週)', so that **驗證合規 (BR005)**.
-37. As a **系統使用者', I want to **應用支援 PWA 離線安裝、Kiosk 模式相容、HTTPS/TLS 1.3 強制', so that **裝置安全合規 (BR010, BR011)**.
-38. As a **照護員/護理員', I want to **共用平板上快速切換使用者帳號 (下拉選單記住最近 5 組)', so that **多位護理員輪流使用同一裝置仍有完整審計軌跡**.
-39. As a **系統使用者', I want to **同步狀態顯示 (同步中/待同步 N 筆/衝突 N 筆) 與衝突中心頁面', so that **掌握離線資料同步進度與處理衝突**.
-40. As a **系統使用者', I want to **關鍵衝突 (藥物給藥、生命徵象) 強制彈窗確認，不可忽略', so that **確保醫療安全資料正確性**.
+32. As a **系統管理員**, I want to **管理使用者帳號與角色指派**, so that **確保基於角色的存取控制 (US30, US44, BR010)**.
+33. As a **系統管理員**, I want to **系統強制 24 小時記錄鎖定與電子簽章欄位**, so that **保持資料完整性並符合法律要求 (BR001, BR002)**.
+34. As a **系統管理員**, I want to **新住民合約簽署功能在 3 天審閱期結束前自動鎖定**, so that **符合消保法規定 (BR006)**.
+35. As a **系統管理員**, I want to **系統根據住民「三管」狀態動態計算護理人力比例 (一般 1:20、三管 1:15)**, so that **優化人力配置 (BR004)**.
+36. As a **系統管理員**, I want to **系統強制夜班 (22:00-08:00) 至少有一名本國籍員工在崗**, so that **滿足監管要求 (BR003)**.
+37. As a **系統管理員**, I want to **系統自動統計並報告特約社工每週工作時數 (最低 16 小時/週)**, so that **驗證合規 (BR005)**.
+38. As a **系統使用者**, I want to **應用支援 PWA 離線安裝、Kiosk 模式相容、HTTPS/TLS 1.3 強制**, so that **裝置安全合規 (BR010, BR011)**.
+39. As a **照護員/護理員**, I want to **共用平板上快速切換使用者帳號 (下拉選單記住最近 5 組)**, so that **多位護理員輪流使用同一裝置仍有完整審計軌跡**.
+40. As a **系統使用者**, I want to **同步狀態顯示 (同步中/待同步 N 筆/衝突 N 筆) 與衝突中心頁面**, so that **掌握離線資料同步進度與處理衝突**.
+41. As a **系統使用者**, I want to **關鍵衝突 (藥物給藥、生命徵象) 強制彈窗確認，不可忽略**, so that **確保醫療安全資料正確性**.
 
 ---
 
@@ -129,12 +133,12 @@
 - **快速切換**：`GET /users/switchable` — 回傳可切換帳號清單 (最近 5 組)，前端下拉選單用
 
 #### 2. 住民模組 (`/api/v1/residents`)
-- `GET /residents` — 列表（支援 `?status=&hasThreePipe=&q=` 篩選）
-- `GET /residents/:id` — 明細（含三管狀態、照護計畫摘要）
+- `GET /residents` — 列表（支援 `?status=&hasThreePipe=&identityType=&dependencyLevel=&q=` 篩選）
+- `GET /residents/:id` — 明細（含三管狀態、管路清單、床位、緊急聯絡人、身份別、依賴程度、身心障礙、重大傷病、照護計畫摘要）
 - `POST /residents` — 建立 (supervisor/admin/sysadmin)
 - `PATCH /residents/:id` — 編輯 (supervisor/admin/sysadmin)
-- `DELETE /residents/:id` — 軟刪除/停用 (admin/sysadmin)
-- **業務規則**：入住日期 ≤ 今天；狀態 enum；特殊需求陣列
+- `DELETE /residents/:id` — 軟刪除/停用 (admin/sysadmin)，**住民編號永不重用**
+- **業務規則**：入住日期 ≤ 今天；狀態 enum；住民編號唯一索引；hasThreePipe 由 tubes 自動衍生；床位唯一性檢查 (同時間不重複)
 
 #### 3. 日常照護記錄模組 (`/api/v1/care-records`)
 - `GET /care-records` — 列表（支援 `?residentId=&dateFrom=&dateTo=&status=&staffId=`）
@@ -176,27 +180,86 @@
 - `GET /system/sync/status` — 同步狀態 (待同步筆數、衝突筆數、最後同步時間)
 - `POST /system/sync/conflicts/resolve` — 衝突解決 (接受 server / 保留 local / 手動合併)
 
-### 資料模型關鍵決策 (來自 CONTEXT.md 與 grill 共識)
+### 資料模型關鍵決策 (來自 CONTEXT.md、LRP_Discussion_Summary.md、grill 共識與實際資料對齊)
 
 ```typescript
-// 住民
+// 住民 - 對齊實際匯入資料格式 (docs/住民資料.json)
 interface Resident {
-  residentId: string;           // UUID
-  name: string;
-  gender: 'Male' | 'Female';
-  dateOfBirth: string;          // ISO 8601
-  address: string;
-  insuranceId: string;
-  diagnosis: string;
-  admissionDate: string;        // ISO 8601, <= today
-  status: 'Active' | 'Inactive';
-  specialNeeds: string[];       // 含 "NG管", "Foley導尿管", "氣切管" 等
-  emergencyContact: { name: string; phone: string; relationship: string };
-  hasThreePipe: boolean;        // 衍生欄位：三管任一為真
-  createdAt: string;
-  updatedAt: string;
+  // 系統識別
+  residentId: string;           // UUID，系統主鍵
+  residentNumber: string;       // 住民編號 (如 "0040", "0066")，業務主鍵，**唯一且永不重用**，移出住民資料仍保留
+  
+  // 基本資料
+  name: string;                 // 姓名
+  gender: 'Male' | 'Female';    // 性別：實際資料為 "男"/"女"，轉換對應
+  dateOfBirth: string;          // ISO 8601 (YYYY-MM-DD)；實際資料為民國年 "035/01/13" 需轉換 (民國年+1911)
+  idNumber: string;             // 身分證字號 (台灣身分證，如 "A201529776")，**非健保 ID**
+  
+  // 地址結構 (實際資料有通訊地與戶籍地址分離)
+  mailingAddress: string;       // 通訊地
+  registeredAddress: string;    // 戶籍地址
+  
+  // 入住與床位
+  admissionDate: string;        // ISO 8601；實際資料為民國年 "111/01/21" 需轉換
+  bedNumber: string;            // 床位編號 (如 "1-1", "1-2", "2-3")，營運單位自訂
+  
+  // 管路與三管判斷 (關鍵：BR004 動態護理比例)
+  tubes: string[];              // 管路清單，解析自 "管路" 欄位：["尿管", "鼻胃管", "氣切管"] 等
+  hasThreePipe: boolean;        // 衍生欄位：tubes 包含任一「三管」(鼻胃管/尿管/氣切管) 為 true
+  
+  // 緊急聯絡人 (實際資料欄位豐富)
+  emergencyContact: {
+    name: string;               // 第一聯絡姓名
+    relationship: string;       // 第一聯絡關係
+    phone: string;              // 第一聯絡電話
+    mobile: string;             // 第一聯絡手機
+    address: string;            // 第一聯絡地址
+    notes: string;              // 第一聯絡備註
+  };
+  
+  // 評鑑/法規相關欄位 (實際資料完整保留)
+  identityType: string;         // 身份別：一般戶/中低收入戶/低收入戶/榮民/眷/原住民/緊急安置/空值
+  dependencyLevel: string;      // 依賴程度：完全依賴/部分依賴/可自行活動
+  disabilityInfo: string;       // 身心障礙類別/等級/到期日：如 "第1類，重度，2030/09/30"
+  majorIllness: string;         // 重大傷病/到期日
+  
+  // 其它實際資料欄位
+  educationLevel: string;       // 教育程度
+  religion: string;             // 宗教信仰
+  workHistory: string;          // 工作史
+  
+  // 狀態與稽核
+  status: 'Active' | 'Inactive'; // 狀態：在住/已移出 (軟刪除)
+  diagnosis: string;            // 主要診斷 (從實際資料推導或手動填寫)
+  createdAt: string;            // ISO 8601
+  updatedAt: string;            // ISO 8601
   version: number;              // 樂觀鎖/同步用
 }
+
+// 住民匯入轉換規則 (供遷移腳本參考)
+/*
+  來源欄位 → 目標欄位：
+  - 序號 → 忽略 (匯入順序)
+  - 姓名 → name
+  - 性別 → "男"→"Male", "女"→"Female"
+  - 生日 → dateOfBirth: 民國年轉西元 (年+1911)，格式 YYYY-MM-DD
+  - 通訊地 → mailingAddress
+  - 身分證號 → idNumber
+  - 戶籍地址 → registeredAddress
+  - 住民編號 → residentNumber (唯一索引)
+  - 床位 → bedNumber
+  - 第一聯絡姓名/關係/電話/手機/地址/備註 → emergencyContact 物件
+  - 入住日期 → admissionDate: 民國年轉西元
+  - 管路 → tubes: 以 "、"、"、"、"、" 等分隔符 split，trim 空白；空字串 → []
+  - 身份別 → identityType
+  - 依賴程度 → dependencyLevel
+  - 身心障礙類別/等級/到期日 → disabilityInfo
+  - 重大傷病/到期日 → majorIllness
+  - 工作史 → workHistory
+  - 教育程度 → educationLevel
+  - 宗教信仰 → religion
+  - hasThreePipe = tubes.some(t => ["鼻胃管", "尿管", "氣切管", "留置尿管", "NG管", "Foley導尿管"].includes(t))
+*/
 
 // 日常照護記錄
 interface CareRecord {
