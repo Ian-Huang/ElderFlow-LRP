@@ -4,14 +4,14 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 建立 `apps/web` 前端專案：Vite + React + TypeScript + Tailwind CSS
-- [ ] 建立 `packages/shared` 型別套件：Resident、CareRecord、Medication、CarePlan、AuditEntry、SyncConflict 等介面（從規格提取）
-- [ ] 設定 ESLint (Airbnb/標準)、Prettier、Husky pre-commit hooks
-- [ ] 設定 GitHub Actions：前端建構、型別檢查、單元測試、部署至 Azure Static Web Apps
-- [ ] 設定 Vite PWA Plugin (Workbox) ：`registerType: 'autoUpdate'`、manifest.json (`display: "fullscreen"`、`orientation: "landscape"`)
-- [ ] 設定 MSW (Mock Service Worker)：`handlers/` 目錄結構、環境變數切換 `MOCK_API=true/false`、預設開啟 mock 模式
-- [ ] 設定共用 API 呼叫層：TanStack Query + `apiClient` 統一錯誤處理、攔截器（支援 MSW 與真實後端無縫切換）
-- [ ] 設定 Zustand 全域狀態：auth、sync、UI theme
-- [ ] 驗證：`npm run dev` 啟動、MSW 攔截所有 `/api/*` 回傳 mock 資料、建構產物可部署
+- [x] 建立 `apps/web` 前端專案：Vite + React + TypeScript + Tailwind CSS
+- [x] 建立 `packages/shared` 型別套件：Resident、CareRecord、Medication、CarePlan、AuditEntry、SyncConflict 等介面（從規格提取）
+- [x] 設定 ESLint (Airbnb/標準)、Prettier、Husky pre-commit hooks
+- [x] 設定 GitHub Actions：前端建構、型別檢查、單元測試、部署至 Azure Static Web Apps
+- [x] 設定 Vite PWA Plugin (Workbox) ：`registerType: 'autoUpdate'`、manifest.json (`display: "fullscreen"`、`orientation: "landscape"`)
+- [x] 設定 MSW (Mock Service Worker)：`handlers/` 目錄結構、環境變數切換 `MOCK_API=true/false`、預設開啟 mock 模式
+- [x] 設定共用 API 呼叫層：TanStack Query + `apiClient` 統一錯誤處理、攔截器（支援 MSW 與真實後端無縫切換）
+- [x] 設定 Zustand 全域狀態：auth、sync、UI theme
+- [x] 驗證：`npm run dev` 啟動、MSW 攔截所有 `/api/*` 回傳 mock 資料、建構產物可部署
