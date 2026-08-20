@@ -23,5 +23,10 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "npm@10.8.0"
+  "packageManager": "npm@10.8.0",
+  "msw": {
+    "workerDirectory": [
+      "apps/web/public"
+    ]
+  }
 }
