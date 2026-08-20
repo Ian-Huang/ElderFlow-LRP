@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt'],
+      includeAssets: ['favicon.ico', 'robots.txt', 'sw-sync.js'],
       manifest: {
         name: 'LRP 長照管理系統',
         short_name: 'LRP',

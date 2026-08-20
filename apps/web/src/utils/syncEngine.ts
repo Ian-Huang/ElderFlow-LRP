@@ -111,6 +111,33 @@ async function processSyncResponse(items: SyncQueueItem[], response: SyncBatchRe
   }
 }
 
+function groupQueueItemsByEntityType(queueItems: SyncQueueItem[]) {
+  const groups = new Map<SyncEntityType, SyncQueueItem[]>();
+
+  for (const item of queueItems) {
+    const current = groups.get(item.entityType);
+    if (current) {
+      current.push(item);
+      continue;
+    }
+
+    groups.set(item.entityType, [item]);
+  }
+
+  return [...groups.values()];
+}
+
+async function buildSyncOperations(queueItems: SyncQueueItem[]) {
+  return queueItems.map((item) => ({
+    localId: item.localId,
+    entityType: item.entityType,
+    entityId: item.entityId,
+    operation: item.operation,
+    payload: item.payload,
+    recordType: mapEntityTypeToRecordType(item.entityType),
+  }));
+}
+
 export async function triggerSyncNow() {
   if (!navigator.onLine) {
     useSyncStore.getState().setOnlineStatus(false);
@@ -128,24 +155,21 @@ export async function triggerSyncNow() {
       return;
     }
 
-    const operations = queueItems.map((item) => ({
-      localId: item.localId,
-      entityType: item.entityType,
-      entityId: item.entityId,
-      operation: item.operation,
-      payload: item.payload,
-      recordType: mapEntityTypeToRecordType(item.entityType),
-    }));
+    const groupedBatches = groupQueueItemsByEntityType(queueItems);
 
-    const result = await apiClient.post<SyncBatchResponse>('/sync', {
-      operations,
-    });
+    for (const batchItems of groupedBatches) {
+      const operations = await buildSyncOperations(batchItems);
+      const result = await apiClient.post<SyncBatchResponse>('/sync', {
+        operations,
+      });
 
-    if (!result.success || !result.data) {
-      throw new Error(result.error?.message || '同步失敗');
+      if (!result.success || !result.data) {
+        throw new Error(result.error?.message || '同步失敗');
+      }
+
+      await processSyncResponse(batchItems, result.data);
     }
 
-    await processSyncResponse(queueItems, result.data);
     useSyncStore.getState().setLastSyncedAt(new Date().toISOString());
   } catch (error) {
     const queueItems = await offlineDb.SyncQueue.orderBy('createdAt').toArray();

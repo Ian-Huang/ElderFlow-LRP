@@ -64,6 +64,27 @@ Object.defineProperty(global, 'crypto', {
   },
 });
 
+Object.defineProperty(window, 'SyncManager', {
+  writable: true,
+  value: class SyncManagerMock {
+    register() {
+      return Promise.resolve();
+    }
+  },
+});
+
+Object.defineProperty(navigator, 'serviceWorker', {
+  writable: true,
+  value: {
+    ready: Promise.resolve({
+      sync: {
+        register: vi.fn().mockResolvedValue(undefined),
+      },
+    }),
+    addEventListener: vi.fn(),
+  },
+});
+
 // Suppress console.error in tests (optional)
 const originalError = console.error;
 beforeAll(() => {

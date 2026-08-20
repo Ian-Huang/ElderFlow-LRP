@@ -155,4 +155,111 @@ describe('syncEngine', () => {
     expect(record?.syncStatus).toBe('conflict');
     expect(useSyncStore.getState().conflicts).toHaveLength(1);
   });
+
+  it('should sync in grouped batches by entity type', async () => {
+    const now = new Date().toISOString();
+
+    await offlineDb.Residents.put({
+      localId: 'local-resident-1',
+      residentId: 'RES-200',
+      name: '住民 A',
+      gender: 'Male',
+      dateOfBirth: '1950-01-01',
+      address: '台中市',
+      insuranceId: 'B123456789',
+      diagnosis: '診斷 A',
+      admissionDate: '2024-01-01',
+      specialNeeds: '',
+      status: 'Active',
+      hasThreePipe: false,
+      syncStatus: 'pending',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await offlineDb.Medications.put({
+      localId: 'local-med-1',
+      medicationId: 'MED-200',
+      residentId: 'RES-200',
+      name: '藥物 A',
+      dosage: '1 tab',
+      frequency: 'TwiceDaily',
+      schedule: ['08:00', '20:00'],
+      nextScheduled: '2026-08-20T08:00:00.000Z',
+      stockLevel: 30,
+      reorderThreshold: 10,
+      notes: '',
+      status: 'Active',
+      syncStatus: 'pending',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await offlineDb.SyncQueue.bulkPut([
+      {
+        localId: 'local-resident-1',
+        entityType: 'Residents',
+        entityId: 'RES-200',
+        operation: 'update',
+        payload: { residentId: 'RES-200', name: '住民 A 更新' },
+        retryCount: 0,
+        createdAt: `${now}-1`,
+        updatedAt: now,
+      },
+      {
+        localId: 'local-med-1',
+        entityType: 'Medications',
+        entityId: 'MED-200',
+        operation: 'update',
+        payload: { medicationId: 'MED-200', dosage: '2 tab' },
+        retryCount: 0,
+        createdAt: `${now}-2`,
+        updatedAt: now,
+      },
+    ]);
+
+    mockedPost
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          accepted: [
+            {
+              localId: 'local-resident-1',
+              entityType: 'Residents',
+              entityId: 'RES-200',
+              serverVersion: 2,
+            },
+          ],
+          conflicts: [],
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          accepted: [
+            {
+              localId: 'local-med-1',
+              entityType: 'Medications',
+              entityId: 'MED-200',
+              serverVersion: 2,
+            },
+          ],
+          conflicts: [],
+        },
+      });
+
+    await triggerSyncNow();
+
+    expect(mockedPost).toHaveBeenCalledTimes(2);
+
+    const firstOps = mockedPost.mock.calls[0]?.[1] as { operations: Array<{ entityType: string }> };
+    const secondOps = mockedPost.mock.calls[1]?.[1] as { operations: Array<{ entityType: string }> };
+
+    expect(firstOps.operations.every((op) => op.entityType === 'Residents')).toBe(true);
+    expect(secondOps.operations.every((op) => op.entityType === 'Medications')).toBe(true);
+
+    expect(await offlineDb.SyncQueue.count()).toBe(0);
+  });
 });
