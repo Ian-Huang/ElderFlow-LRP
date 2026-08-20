@@ -2,12 +2,17 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { SyncConflict } from '@lrp/shared';
 
+export type AppSyncConflict = SyncConflict & {
+  localId?: string;
+  isCritical?: boolean;
+};
+
 interface SyncState {
   isOnline: boolean;
   isSyncing: boolean;
   lastSyncedAt: string | null;
   pendingChanges: number;
-  conflicts: SyncConflict[];
+  conflicts: AppSyncConflict[];
   syncErrors: string[];
 
   // Actions
@@ -17,10 +22,10 @@ interface SyncState {
   incrementPendingChanges: () => void;
   decrementPendingChanges: () => void;
   setPendingChanges: (count: number) => void;
-  addConflict: (conflict: SyncConflict) => void;
-  updateConflict: (conflictId: string, updates: Partial<SyncConflict>) => void;
+  addConflict: (conflict: AppSyncConflict) => void;
+  updateConflict: (conflictId: string, updates: Partial<AppSyncConflict>) => void;
   removeConflict: (conflictId: string) => void;
-  setConflicts: (conflicts: SyncConflict[]) => void;
+  setConflicts: (conflicts: AppSyncConflict[]) => void;
   addSyncError: (error: string) => void;
   clearSyncErrors: () => void;
 }

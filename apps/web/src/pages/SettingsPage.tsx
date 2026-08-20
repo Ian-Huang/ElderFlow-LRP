@@ -1,6 +1,7 @@
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useUIStore } from '@/stores/uiStore';
+import { Link } from 'react-router-dom';
 
 /// <reference types="../vite-env" />
 
@@ -106,8 +107,7 @@ export function SettingsPage() {
                         <p className="text-xs text-gray-500">類型: {conflict.conflictType} · 欄位: {conflict.conflictingFields.join(', ')}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button className="btn-secondary text-xs py-1 px-2">使用本地</button>
-                        <button className="btn-secondary text-xs py-1 px-2">使用伺服器</button>
+                        <Link to="/sync/conflicts" className="btn-secondary text-xs py-1 px-2">前往衝突中心</Link>
                         <button className="btn-danger text-xs py-1 px-2" onClick={() => removeConflict(conflict.conflictId)}>
                           刪除
                         </button>

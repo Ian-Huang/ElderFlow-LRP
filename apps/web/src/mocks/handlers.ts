@@ -740,6 +740,105 @@ export const handlers = [
   }),
 
   // Sync endpoints
+  http.post('/api/v1/sync', async ({ request }) => {
+    await delay(300);
+
+    const body = (await request.json()) as {
+      operations: Array<{
+        localId: string;
+        entityType: 'Residents' | 'CareRecords' | 'CareActivities' | 'Medications' | 'TimeSlots' | 'CarePlans';
+        entityId: string;
+        operation: 'create' | 'update' | 'delete';
+        payload: Record<string, unknown>;
+        recordType?: 'Resident' | 'CareRecord' | 'Medication' | 'CarePlan';
+      }>;
+    };
+
+    const accepted: Array<{
+      localId: string;
+      entityType: 'Residents' | 'CareRecords' | 'CareActivities' | 'Medications' | 'TimeSlots' | 'CarePlans';
+      entityId: string;
+      serverVersion: number;
+    }> = [];
+
+    const conflicts: Array<{
+      localId: string;
+      conflictId: string;
+      recordType: 'Resident' | 'CareRecord' | 'Medication' | 'CarePlan';
+      recordId: string;
+      localData: Record<string, unknown>;
+      serverData: Record<string, unknown>;
+      conflictType: 'FieldLevel' | 'SectionLevel' | 'Duplicate';
+      conflictingFields: string[];
+      isCritical: boolean;
+    }> = [];
+
+    for (const operation of body.operations || []) {
+      const recordType = operation.recordType || (
+        operation.entityType === 'Residents'
+          ? 'Resident'
+          : operation.entityType === 'Medications'
+            ? 'Medication'
+            : operation.entityType === 'CarePlans'
+              ? 'CarePlan'
+              : 'CareRecord'
+      );
+
+      const shouldConflict =
+        operation.payload.forceConflict === true ||
+        operation.entityId.toLowerCase().includes('conflict') ||
+        (recordType === 'Medication' && operation.operation === 'update') ||
+        (recordType === 'CareRecord' && operation.operation === 'update');
+
+      if (shouldConflict) {
+        const conflictingFields = recordType === 'Medication'
+          ? ['dosage', 'schedule']
+          : recordType === 'CareRecord'
+            ? ['activities', 'vitals']
+            : ['updatedAt'];
+
+        const conflict = {
+          localId: operation.localId,
+          conflictId: `SC-${String(mockSyncConflicts.length + conflicts.length + 1).padStart(3, '0')}`,
+          recordType,
+          recordId: operation.entityId,
+          localData: operation.payload,
+          serverData: {
+            ...operation.payload,
+            updatedBy: 'server',
+            syncedAt: new Date().toISOString(),
+          },
+          conflictType: 'FieldLevel' as const,
+          conflictingFields,
+          isCritical: recordType === 'Medication' || recordType === 'CareRecord',
+        };
+
+        mockSyncConflicts.push({
+          conflictId: conflict.conflictId,
+          recordId: conflict.recordId,
+          recordType: conflict.recordType,
+          localData: conflict.localData,
+          serverData: conflict.serverData,
+          conflictType: conflict.conflictType,
+          conflictingFields: conflict.conflictingFields,
+          status: 'Pending',
+          createdAt: new Date().toISOString(),
+        });
+
+        conflicts.push(conflict);
+      } else {
+        accepted.push({
+          localId: operation.localId,
+          entityType: operation.entityType,
+          entityId: operation.entityId,
+          serverVersion: 2,
+        });
+      }
+    }
+
+    return HttpResponse.json(createApiResponse({ accepted, conflicts }));
+  }),
+
   http.get('/api/v1/sync/conflicts', async () => {
     await delay(200);
     return HttpResponse.json(createApiResponse(mockSyncConflicts));

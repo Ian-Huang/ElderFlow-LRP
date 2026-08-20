@@ -4,11 +4,10 @@ import type { RegisterSWOptions } from 'virtual:pwa-register';
 import { registerSW } from 'virtual:pwa-register';
 
 export function registerPWA(options: RegisterSWOptions = {}) {
-  registerSW({
+  const updateSW = registerSW({
     onNeedRefresh() {
       if (confirm('有新版本可用，是否立即更新？')) {
-        // The registerSW function doesn't return an update function in this version
-        window.location.reload();
+        void updateSW(true);
       }
     },
     onOfflineReady() {
@@ -22,4 +21,6 @@ export function registerPWA(options: RegisterSWOptions = {}) {
     },
     ...options,
   });
+
+  return updateSW;
 }

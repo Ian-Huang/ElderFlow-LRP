@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useUIStore } from '@/stores/uiStore';
 import { UserSwitcher } from '@/components/UserSwitcher';
+import { SyncStatusIndicator } from '@/components/SyncStatusIndicator';
 import type { UserRole } from '@lrp/shared';
 
 export function Layout() {
@@ -111,7 +112,7 @@ export function Layout() {
               <div className="p-2 bg-warning-50 border border-warning-200 rounded-lg">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-warning-800 font-medium">{pendingConflicts} 個同步衝突</span>
-                  <NavLink to="/settings" className="text-primary-600 hover:underline">
+                  <NavLink to="/sync/conflicts" className="text-primary-600 hover:underline">
                     處理
                   </NavLink>
                 </div>
@@ -204,13 +205,7 @@ export function Layout() {
               )}
 
               {/* Sync status */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50">
-                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success-500' : 'bg-danger-500'}`} />
-                <span className="text-xs text-gray-600">{isOnline ? '線上' : '離線'}</span>
-                {isSyncing && (
-                  <span className="text-xs text-primary-600 animate-pulse">同步中</span>
-                )}
-              </div>
+              <SyncStatusIndicator />
             </div>
           </div>
         </header>

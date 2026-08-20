@@ -52,6 +52,11 @@ Object.defineProperty(navigator, 'onLine', {
   value: true,
 });
 
+Object.defineProperty(document, 'hidden', {
+  writable: true,
+  value: false,
+});
+
 // Mock crypto.randomUUID
 Object.defineProperty(global, 'crypto', {
   value: {

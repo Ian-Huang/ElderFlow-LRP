@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { App } from './App';
 import './styles/index.css';
 import { registerPWA } from './utils/pwa';
+import { initializeSyncEngine } from './utils/syncEngine';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,4 +42,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 if (import.meta.env.PROD) {
   registerPWA();
+}
+
+let cleanupSyncEngine: (() => void) | undefined;
+
+if (typeof window !== 'undefined') {
+  void initializeSyncEngine().then((cleanup) => {
+    cleanupSyncEngine = cleanup;
+  });
+
+  window.addEventListener('beforeunload', () => {
+    cleanupSyncEngine?.();
+  });
 }
