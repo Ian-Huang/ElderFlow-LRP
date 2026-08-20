@@ -484,6 +484,8 @@ export const handlers = [
     const pageSize = parseInt(url.searchParams.get('pageSize') || '20');
     const residentId = url.searchParams.get('residentId');
     const status = url.searchParams.get('status');
+    const startDate = url.searchParams.get('startDate');
+    const endDate = url.searchParams.get('endDate');
 
     let filtered = [...mockCareRecords];
     if (residentId) {
@@ -492,8 +494,27 @@ export const handlers = [
     if (status) {
       filtered = filtered.filter((r) => r.status === status);
     }
+    if (startDate) {
+      const start = new Date(startDate).getTime();
+      filtered = filtered.filter((r) => new Date(r.timestamp).getTime() >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate).getTime();
+      filtered = filtered.filter((r) => new Date(r.timestamp).getTime() <= end);
+    }
 
-    return HttpResponse.json(createApiResponse(createPaginatedResponse(filtered, page, pageSize)));
+    const normalized = filtered.map((record) => {
+      const submitted = new Date(record.submittedAt).getTime();
+      const shouldLock = Date.now() - submitted > 24 * 60 * 60 * 1000;
+      if (!shouldLock) return record;
+      return {
+        ...record,
+        lockType: 'Locked' as const,
+        lockedAt: record.lockedAt || new Date(submitted + 24 * 60 * 60 * 1000).toISOString(),
+      };
+    });
+
+    return HttpResponse.json(createApiResponse(createPaginatedResponse(normalized, page, pageSize)));
   }),
 
   http.get('/api/v1/care-records/:id', async ({ params }) => {
@@ -505,12 +526,28 @@ export const handlers = [
         { status: 404 }
       );
     }
-    return HttpResponse.json(createApiResponse(record));
+
+    const submitted = new Date(record.submittedAt).getTime();
+    const shouldLock = Date.now() - submitted > 24 * 60 * 60 * 1000;
+    const lockedRecord = shouldLock
+      ? {
+          ...record,
+          lockType: 'Locked' as const,
+          lockedAt: record.lockedAt || new Date(submitted + 24 * 60 * 60 * 1000).toISOString(),
+        }
+      : record;
+
+    return HttpResponse.json(createApiResponse(lockedRecord));
   }),
 
   http.post('/api/v1/care-records', async ({ request }) => {
     await delay(300);
-    const body = await request.json() as { residentId: string; timestamp: string; activities: unknown[]; staffId: string; staffName: string; notes: string };
+    const body = await request.json() as { residentId: string; timestamp: string; activities: unknown[]; staffId: string; staffName: string; notes: string; evidence?: CareRecord['evidence'] };
+
+    const baseScore = 50;
+    const activityScore = Math.min(40, (body.activities?.length || 0) * 20);
+    const evidenceScore = body.evidence && body.evidence.length > 0 ? 10 : 0;
+
     const newRecord: CareRecord = {
       recordId: `CR-${String(mockCareRecords.length + 1).padStart(3, '0')}`,
       residentId: body.residentId,
@@ -518,9 +555,9 @@ export const handlers = [
       activities: body.activities as CareRecord['activities'],
       staffId: body.staffId,
       staffName: body.staffName,
-      completenessScore: 80,
+      completenessScore: Math.min(100, baseScore + activityScore + evidenceScore),
       status: 'Normal',
-      evidence: [],
+      evidence: body.evidence || [],
       notes: body.notes || '',
       submittedAt: new Date().toISOString(),
       lockType: 'Editable',
@@ -532,7 +569,7 @@ export const handlers = [
     return HttpResponse.json(createApiResponse(newRecord), { status: 201 });
   }),
 
-  http.put('/api/v1/care-records/:id', async ({ params, request }) => {
+  http.patch('/api/v1/care-records/:id', async ({ params, request }) => {
     await delay(200);
     const index = mockCareRecords.findIndex((r) => r.recordId === params.id);
     if (index === -1) {
@@ -541,10 +578,102 @@ export const handlers = [
         { status: 404 }
       );
     }
+
+    const current = mockCareRecords[index];
+    if (!current) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: '照護記錄不存在' } },
+        { status: 404 }
+      );
+    }
+    const submitted = new Date(current.submittedAt).getTime();
+    const isLocked = Date.now() - submitted > 24 * 60 * 60 * 1000 || current.lockType === 'Locked';
+    if (isLocked) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'RECORD_LOCKED', message: '紀錄已鎖定，僅能補充修正' } },
+        { status: 409 }
+      );
+    }
+
     const body = await request.json() as Partial<CareRecord>;
-    const updated = { ...mockCareRecords[index], ...body, updatedAt: new Date().toISOString() } as CareRecord;
+    const updated = { ...current, ...body, updatedAt: new Date().toISOString() } as CareRecord;
     mockCareRecords[index] = updated;
     return HttpResponse.json(createApiResponse(updated));
+  }),
+
+  http.post('/api/v1/care-records/:id/status', async ({ params, request }) => {
+    await delay(150);
+    const index = mockCareRecords.findIndex((r) => r.recordId === params.id);
+    if (index === -1) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: '照護記錄不存在' } },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json() as { status: CareRecord['status'] };
+    const updatedRecord: CareRecord = {
+      ...mockCareRecords[index]!,
+      status: body.status,
+      updatedAt: new Date().toISOString(),
+    };
+    mockCareRecords[index] = updatedRecord;
+
+    return HttpResponse.json(createApiResponse(updatedRecord));
+  }),
+
+  http.post('/api/v1/care-records/:id/supplement', async ({ params, request }) => {
+    await delay(200);
+    const original = mockCareRecords.find((r) => r.recordId === params.id);
+    if (!original) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: '照護記錄不存在' } },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json() as { supplementContent: string; reason: string; staffId: string; staffName: string };
+    const nextIndex = mockCareRecords.length + 1;
+    const supplemented: CareRecord = {
+      ...original,
+      recordId: `CR-${String(nextIndex).padStart(3, '0')}`,
+      notes: `${original.notes}\n[補充] ${body.supplementContent}`,
+      lockType: 'Editable',
+      lockedAt: undefined,
+      submittedAt: new Date().toISOString(),
+      modificationHistory: [
+        ...original.modificationHistory,
+        {
+          modificationId: `MOD-${crypto.randomUUID()}`,
+          actionType: 'Supplement',
+          changedBy: body.staffName,
+          changedAt: new Date().toISOString(),
+          fieldName: 'notes',
+          oldValue: original.notes,
+          newValue: `${original.notes}\n[補充] ${body.supplementContent}`,
+          reason: body.reason,
+        },
+      ],
+      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+
+    mockCareRecords.push(supplemented);
+    return HttpResponse.json(createApiResponse(supplemented), { status: 201 });
+  }),
+
+  http.post('/api/v1/care-records/sync', async ({ request }) => {
+    await delay(250);
+    const body = await request.json() as { operations: Array<{ payload: Partial<CareRecord> }> };
+
+    const accepted = (body.operations || []).map((operation, index) => ({
+      localId: `care-record-local-${index + 1}`,
+      entityType: 'CareRecords' as const,
+      entityId: operation.payload.recordId || `CR-SYNC-${index + 1}`,
+      serverVersion: 2,
+    }));
+
+    return HttpResponse.json(createApiResponse({ accepted, conflicts: [] }));
   }),
 
   // Medications endpoints

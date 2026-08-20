@@ -24,7 +24,9 @@ async function bootstrap() {
     const { worker } = await import('./mocks/browser');
     await worker.start({
       onUnhandledRequest: 'bypass',
-      waitUntilReady: true,
+      serviceWorker: {
+        url: '/mockServiceWorker.js',
+      },
     });
   }
 

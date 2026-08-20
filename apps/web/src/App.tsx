@@ -59,6 +59,8 @@ export function App() {
         <Route path="residents" element={<ResidentsPage />} />
         <Route path="residents/:id" element={<ResidentDetailPage />} />
         <Route path="care-records" element={<CareRecordsPage />} />
+        <Route path="care-records/new" element={<CareRecordsPage />} />
+        <Route path="care-records/:id/edit" element={<CareRecordsPage />} />
         <Route path="medications" element={<MedicationsPage />} />
         <Route path="care-plans" element={<CarePlansPage />} />
         <Route path="reports" element={<ReportsPage />} />
