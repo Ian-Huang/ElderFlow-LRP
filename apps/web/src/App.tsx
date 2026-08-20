@@ -10,6 +10,8 @@ import { MedicationsPage } from '@/pages/MedicationsPage';
 import { CarePlansPage } from '@/pages/CarePlansPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { SyncConflictsPage } from '@/pages/SyncConflictsPage';
+import { CriticalConflictModal } from '@/components/CriticalConflictModal';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@lrp/shared';
@@ -46,7 +48,10 @@ export function App() {
       <Route
         element={
           <PrivateRoute>
-            <Layout />
+            <>
+              <Layout />
+              <CriticalConflictModal />
+            </>
           </PrivateRoute>
         }
       >
@@ -58,6 +63,7 @@ export function App() {
         <Route path="care-plans" element={<CarePlansPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="sync/conflicts" element={<SyncConflictsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

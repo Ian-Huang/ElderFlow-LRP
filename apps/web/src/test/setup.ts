@@ -52,10 +52,36 @@ Object.defineProperty(navigator, 'onLine', {
   value: true,
 });
 
+Object.defineProperty(document, 'hidden', {
+  writable: true,
+  value: false,
+});
+
 // Mock crypto.randomUUID
 Object.defineProperty(global, 'crypto', {
   value: {
     randomUUID: () => 'mock-uuid-' + Math.random().toString(36).substr(2, 9),
+  },
+});
+
+Object.defineProperty(window, 'SyncManager', {
+  writable: true,
+  value: class SyncManagerMock {
+    register() {
+      return Promise.resolve();
+    }
+  },
+});
+
+Object.defineProperty(navigator, 'serviceWorker', {
+  writable: true,
+  value: {
+    ready: Promise.resolve({
+      sync: {
+        register: vi.fn().mockResolvedValue(undefined),
+      },
+    }),
+    addEventListener: vi.fn(),
   },
 });
 
