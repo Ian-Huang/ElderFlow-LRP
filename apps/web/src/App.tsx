@@ -34,6 +34,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route
         element={
           <PrivateRoute>
@@ -41,73 +42,16 @@ export function App() {
           </PrivateRoute>
         }
       >
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route
-          path="dashboard"
-          element={
-            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
-              <DashboardPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="residents"
-          element={
-            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
-              <ResidentsPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="residents/:id"
-          element={
-            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
-              <ResidentDetailPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="care-records"
-          element={
-            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
-              <CareRecordsPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="medications"
-          element={
-            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
-              <MedicationsPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="care-plans"
-          element={
-            <PrivateRoute allowedRoles={['supervisor', 'admin', 'sysadmin']}>
-              <CarePlansPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="reports"
-          element={
-            <PrivateRoute allowedRoles={['supervisor', 'admin', 'sysadmin']}>
-              <ReportsPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="settings"
-          element={
-            <PrivateRoute allowedRoles={['admin', 'sysadmin']}>
-              <SettingsPage />
-            </PrivateRoute>
-          }
-        />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="residents" element={<ResidentsPage />} />
+        <Route path="residents/:id" element={<ResidentDetailPage />} />
+        <Route path="care-records" element={<CareRecordsPage />} />
+        <Route path="medications" element={<MedicationsPage />} />
+        <Route path="care-plans" element={<CarePlansPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
