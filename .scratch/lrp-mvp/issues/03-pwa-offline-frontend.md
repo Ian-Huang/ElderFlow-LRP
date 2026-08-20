@@ -4,7 +4,7 @@
 
 **Blocked by:** 01-project-foundation
 
-**Status:** ready-for-human
+**Status:** done
 
 - [ ] 設定 Workbox：快取策略 (Static: CacheFirst、導航: NetworkFirst with offline fallback、API: NetworkFirst with timeout + 背景同步)
 - [ ] `manifest.json` 完整設定：PWA 安裝提示支援、Kiosk 模式相容
