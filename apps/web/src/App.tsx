@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -10,6 +11,7 @@ import { CarePlansPage } from '@/pages/CarePlansPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { useRequireRole } from '@/hooks/useRequireRole';
+import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@lrp/shared';
 
 function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: UserRole[] }) {
@@ -31,6 +33,12 @@ function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode; a
 }
 
 export function App() {
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

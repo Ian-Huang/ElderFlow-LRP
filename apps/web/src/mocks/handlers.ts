@@ -361,10 +361,31 @@ export const handlers = [
         { status: 404 }
       );
     }
-    return HttpResponse.json(createApiResponse({
+
+    const tokens = {
       accessToken: `mock-access-${crypto.randomUUID()}`,
       expiresIn: 900,
+    };
+
+    // Add switched user to switchable users (most recent first, max 5)
+    const newSwitchableUser: SwitchableUser = {
+      userId: user.userId,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      encryptedRefreshToken: body.refreshToken,
+      lastUsedAt: new Date().toISOString(),
+    };
+
+    // Remove existing entry for this user and add to front
+    mockSwitchableUsers = mockSwitchableUsers.filter((u) => u.userId !== user.userId);
+    mockSwitchableUsers = [newSwitchableUser, ...mockSwitchableUsers].slice(0, 5);
+
+    return HttpResponse.json(createApiResponse({
+      accessToken: tokens.accessToken,
+      expiresIn: tokens.expiresIn,
       user,
+      switchableUsers: mockSwitchableUsers,
     }));
   }),
 

@@ -61,6 +61,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       user,
       userRole: user.role,
       isAuthenticated: true,
+      isInitialized: true,
       switchableUsers,
     });
   },

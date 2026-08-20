@@ -9,7 +9,7 @@ interface UserSwitcherProps {
 }
 
 export function UserSwitcher({ className = '' }: UserSwitcherProps) {
-  const { user, switchableUsers, setAuth, switchUser, clearAuth } = useAuthStore();
+  const { user, switchableUsers, setAuth, clearAuth } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -55,6 +55,7 @@ export function UserSwitcher({ className = '' }: UserSwitcherProps) {
         accessToken: string;
         expiresIn: number;
         user: { userId: string; username: string; name: string; role: string; isLocalStaff: boolean };
+        switchableUsers: SwitchableUser[];
       }>('/auth/switch', {
         targetUserId: targetUser.userId,
         refreshToken: targetUser.encryptedRefreshToken,
@@ -73,11 +74,9 @@ export function UserSwitcher({ className = '' }: UserSwitcherProps) {
             avatarUrl: undefined,
             lastLoginAt: new Date().toISOString(),
             createdAt: '',
-          }
+          },
+          response.data.switchableUsers
         );
-
-        // Update switchable users order
-        await switchUser(targetUser.userId);
 
         setIsOpen(false);
       }

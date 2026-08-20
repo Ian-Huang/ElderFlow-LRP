@@ -23,6 +23,7 @@ if (import.meta.env.DEV && import.meta.env.VITE_MOCK_API !== 'false') {
   import('./mocks/browser').then(({ worker }) => {
     worker.start({
       onUnhandledRequest: 'bypass',
+      waitUntilReady: true,
     });
   });
 }
