@@ -4,7 +4,7 @@
 
 **Blocked by:** 01-project-foundation
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] 登入頁面 (`/login`)：帳號/密碼表單、React Hook Form + Zod 驗證、錯誤顯示、載入狀態
 - [x] MSW Mock Handlers：`POST /api/v1/auth/login` (回傳 access/refresh token、角色)、`POST /api/v1/auth/refresh`、`POST /api/v1/auth/logout`、`GET /api/v1/users/me`、`GET /api/v1/users/switchable`
