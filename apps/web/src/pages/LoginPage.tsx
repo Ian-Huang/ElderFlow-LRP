@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useAuthStore } from '@/stores/authStore';
 import { apiClient } from '@/api/apiClient';
 import type { User, AuthTokens, SwitchableUser } from '@lrp/shared';
@@ -10,26 +13,41 @@ interface LoginResponse {
   switchableUsers: SwitchableUser[];
 }
 
+const loginSchema = z.object({
+  username: z.string().min(1, '請輸入帳號'),
+  password: z.string().min(1, '請輸入密碼'),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+
 export function LoginPage() {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    mode: 'onBlur',
+  });
+
+  const onSubmit = async (data: LoginFormData) => {
     setError('');
     setLoading(true);
 
     try {
-      const response = await apiClient.post<LoginResponse>('/auth/login', { username, password });
+      const response = await apiClient.post<LoginResponse>('/auth/login', {
+        username: data.username,
+        password: data.password,
+      });
 
       if (response.success && response.data) {
-        setAuth(response.data.tokens, response.data.user);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        localStorage.setItem('switchableUsers', JSON.stringify(response.data.switchableUsers));
+        await setAuth(response.data.tokens, response.data.user, response.data.switchableUsers);
         navigate('/dashboard');
       } else {
         setError(response.error?.message || '登入失敗');
@@ -43,9 +61,9 @@ export function LoginPage() {
   };
 
   // Demo credentials helper
-  const fillDemo = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
+  const fillDemo = (username: string, password: string) => {
+    setValue('username', username, { shouldValidate: true });
+    setValue('password', password, { shouldValidate: true });
   };
 
   return (
@@ -67,35 +85,49 @@ export function LoginPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label htmlFor="username" className="label">帳號</label>
+                <label htmlFor="username" className="label">
+                  帳號
+                </label>
                 <input
                   id="username"
                   type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="input"
+                  {...register('username')}
+                  className={`input ${errors.username ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500' : ''}`}
                   placeholder="請輸入帳號"
-                  required
                   autoComplete="username"
                   disabled={loading}
+                  aria-invalid={errors.username ? 'true' : 'false'}
+                  aria-describedby={errors.username ? 'username-error' : undefined}
                 />
+                {errors.username && (
+                  <p id="username-error" className="mt-1 text-sm text-danger-600" role="alert">
+                    {errors.username.message}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label htmlFor="password" className="label">密碼</label>
+                <label htmlFor="password" className="label">
+                  密碼
+                </label>
                 <input
                   id="password"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input"
+                  {...register('password')}
+                  className={`input ${errors.password ? 'border-danger-500 focus:border-danger-500 focus:ring-danger-500' : ''}`}
                   placeholder="請輸入密碼"
-                  required
                   autoComplete="current-password"
                   disabled={loading}
+                  aria-invalid={errors.password ? 'true' : 'false'}
+                  aria-describedby={errors.password ? 'password-error' : undefined}
                 />
+                {errors.password && (
+                  <p id="password-error" className="mt-1 text-sm text-danger-600" role="alert">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
 
               <button

@@ -259,6 +259,26 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// In-memory store for switchable users (simulates server-side storage)
+let mockSwitchableUsers: SwitchableUser[] = [
+  {
+    userId: 'user-001',
+    username: 'caregiver1',
+    name: '陳照護',
+    role: 'caregiver',
+    encryptedRefreshToken: 'enc-mock-refresh-1',
+    lastUsedAt: new Date().toISOString(),
+  },
+  {
+    userId: 'user-002',
+    username: 'supervisor1',
+    name: '林主管',
+    role: 'supervisor',
+    encryptedRefreshToken: 'enc-mock-refresh-2',
+    lastUsedAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+];
+
 // Mock handlers
 export const handlers = [
   // Auth endpoints
@@ -279,22 +299,30 @@ export const handlers = [
       expiresIn: 900,
     };
 
-    const switchableUsers: SwitchableUser[] = [
-      {
-        userId: user.userId,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        encryptedRefreshToken: `enc-${tokens.refreshToken}`,
-        lastUsedAt: new Date().toISOString(),
-      },
-    ];
+    // Add current user to switchable users (most recent first, max 5)
+    const newSwitchableUser: SwitchableUser = {
+      userId: user.userId,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      encryptedRefreshToken: `enc-${tokens.refreshToken}`,
+      lastUsedAt: new Date().toISOString(),
+    };
 
-    return HttpResponse.json(createApiResponse({ tokens, user, switchableUsers }));
+    // Remove existing entry for this user and add to front
+    mockSwitchableUsers = mockSwitchableUsers.filter((u) => u.userId !== user.userId);
+    mockSwitchableUsers = [newSwitchableUser, ...mockSwitchableUsers].slice(0, 5);
+
+    return HttpResponse.json(createApiResponse({ tokens, user, switchableUsers: mockSwitchableUsers }));
   }),
 
-  http.post('/api/v1/auth/refresh', async () => {
+  http.post('/api/v1/auth/refresh', async ({ request }) => {
     await delay(200);
+    // Simulate HttpOnly cookie check - in real app this would be automatic
+    const cookieHeader = request.headers.get('Cookie');
+    // For mock, we just check if there's any auth context
+    // In real HttpOnly cookie flow, the browser sends cookies automatically
+    void cookieHeader; // silence unused warning
     return HttpResponse.json(createApiResponse({
       accessToken: `mock-access-${crypto.randomUUID()}`,
       expiresIn: 900,
@@ -320,24 +348,7 @@ export const handlers = [
 
   http.get('/api/v1/users/switchable', async () => {
     await delay(100);
-    return HttpResponse.json(createApiResponse([
-      {
-        userId: 'user-001',
-        username: 'caregiver1',
-        name: '陳照護',
-        role: 'caregiver',
-        encryptedRefreshToken: 'enc-mock-refresh-1',
-        lastUsedAt: new Date().toISOString(),
-      },
-      {
-        userId: 'user-002',
-        username: 'supervisor1',
-        name: '林主管',
-        role: 'supervisor',
-        encryptedRefreshToken: 'enc-mock-refresh-2',
-        lastUsedAt: new Date(Date.now() - 86400000).toISOString(),
-      },
-    ]));
+    return HttpResponse.json(createApiResponse(mockSwitchableUsers));
   }),
 
   http.post('/api/v1/auth/switch', async ({ request }) => {

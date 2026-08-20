@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '@/stores/authStore';
 import type { ApiResponse, ApiError } from '@lrp/shared';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -20,11 +21,19 @@ class ApiClient {
     this.setupInterceptors();
   }
 
+  private getAccessToken(): string | null {
+    return useAuthStore.getState().accessToken;
+  }
+
+  private setAccessToken(token: string): void {
+    useAuthStore.getState().setAccessToken(token);
+  }
+
   private setupInterceptors() {
-    // Request interceptor - add auth token
+    // Request interceptor - add auth token from auth store (IndexedDB-backed)
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const accessToken = localStorage.getItem('accessToken');
+        const accessToken = this.getAccessToken();
         if (accessToken && config.headers) {
           config.headers.Authorization = `Bearer ${accessToken}`;
         }
@@ -50,8 +59,7 @@ class ApiClient {
             return this.client(originalRequest);
           } catch {
             // Refresh failed, redirect to login
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
+            useAuthStore.getState().clearAuth();
             window.location.href = '/login';
             return Promise.reject(error);
           }
@@ -79,7 +87,7 @@ class ApiClient {
         throw new Error('Failed to refresh token');
       }
 
-      localStorage.setItem('accessToken', newAccessToken);
+      this.setAccessToken(newAccessToken);
       return newAccessToken;
     })();
 

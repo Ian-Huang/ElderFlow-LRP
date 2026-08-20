@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useUIStore } from '@/stores/uiStore';
+import { UserSwitcher } from '@/components/UserSwitcher';
 import type { UserRole } from '@lrp/shared';
 
 export function Layout() {
@@ -172,6 +173,9 @@ export function Layout() {
             </div>
 
             <div className="flex items-center gap-4">
+              {/* User Switcher */}
+              <UserSwitcher />
+
               {/* Theme toggle */}
               <button
                 onClick={() => useUIStore.getState().setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}

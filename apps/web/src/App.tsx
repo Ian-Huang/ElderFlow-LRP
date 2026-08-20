@@ -9,18 +9,22 @@ import { MedicationsPage } from '@/pages/MedicationsPage';
 import { CarePlansPage } from '@/pages/CarePlansPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
-import { useAuthStore } from '@/stores/authStore';
-import { useEffect } from 'react';
+import { useRequireRole } from '@/hooks/useRequireRole';
+import type { UserRole } from '@lrp/shared';
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, initializeAuth } = useAuthStore();
+function PrivateRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: UserRole[] }) {
+  const { isAllowed, isLoading } = useRequireRole(allowedRoles || ['caregiver', 'supervisor', 'admin', 'sysadmin']);
 
-  useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" aria-label="載入中" />
+      </div>
+    );
+  }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  if (!isAllowed) {
+    return null; // Redirect handled by useRequireRole
   }
 
   return <>{children}</>;
@@ -38,14 +42,70 @@ export function App() {
         }
       >
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="residents" element={<ResidentsPage />} />
-        <Route path="residents/:id" element={<ResidentDetailPage />} />
-        <Route path="care-records" element={<CareRecordsPage />} />
-        <Route path="medications" element={<MedicationsPage />} />
-        <Route path="care-plans" element={<CarePlansPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route
+          path="dashboard"
+          element={
+            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
+              <DashboardPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="residents"
+          element={
+            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
+              <ResidentsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="residents/:id"
+          element={
+            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
+              <ResidentDetailPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="care-records"
+          element={
+            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
+              <CareRecordsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="medications"
+          element={
+            <PrivateRoute allowedRoles={['caregiver', 'supervisor', 'admin', 'sysadmin']}>
+              <MedicationsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="care-plans"
+          element={
+            <PrivateRoute allowedRoles={['supervisor', 'admin', 'sysadmin']}>
+              <CarePlansPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="reports"
+          element={
+            <PrivateRoute allowedRoles={['supervisor', 'admin', 'sysadmin']}>
+              <ReportsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <PrivateRoute allowedRoles={['admin', 'sysadmin']}>
+              <SettingsPage />
+            </PrivateRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
