@@ -138,8 +138,8 @@ class ApiClient {
     return response.data;
   }
 
-  async delete<T>(url: string) {
-    const response = await this.client.delete<ApiResponse<T>>(url);
+  async delete<T>(url: string, data?: unknown) {
+    const response = await this.client.delete<ApiResponse<T>>(url, { data });
     return response.data;
   }
 }

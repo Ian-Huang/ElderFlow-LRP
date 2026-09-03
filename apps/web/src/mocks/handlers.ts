@@ -48,53 +48,11 @@ const mockUsers: User[] = [
   },
 ];
 
-const mockResidents: Resident[] = [
-  {
-    residentId: 'RES-001',
-    name: '王大明',
-    gender: 'Male',
-    dateOfBirth: '1945-03-15',
-    address: '台北市大安區仁愛路四段 123 號',
-    insuranceId: 'A123456789',
-    diagnosis: '高血壓、糖尿病、失智症',
-    admissionDate: '2023-06-01',
-    specialNeeds: '需協助進食、行動不便',
-    status: 'Active',
-    hasThreePipe: true,
-    createdAt: '2023-06-01T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-  {
-    residentId: 'RES-002',
-    name: '李美華',
-    gender: 'Female',
-    dateOfBirth: '1950-07-22',
-    address: '新北市板橋區文化路 456 號',
-    insuranceId: 'B987654321',
-    diagnosis: '中風後遺症、骨質疏鬆',
-    admissionDate: '2023-08-15',
-    specialNeeds: '左側癱瘓、需輪椅',
-    status: 'Active',
-    hasThreePipe: false,
-    createdAt: '2023-08-15T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-  {
-    residentId: 'RES-003',
-    name: '陳志明',
-    gender: 'Male',
-    dateOfBirth: '1938-11-05',
-    address: '桃園市中壢區環中路 789 號',
-    insuranceId: 'C456789123',
-    diagnosis: '帕金森氏症、憂鬱症',
-    admissionDate: '2023-10-01',
-    specialNeeds: '震顫、需心理支持',
-    status: 'Active',
-    hasThreePipe: false,
-    createdAt: '2023-10-01T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-];
+import { seedResidents, transformRawResident, type RawResidentJson } from './residentSeedData';
+import { isThreePipe, parsePipesString, rocToIso } from '@/utils/rocDate';
+
+// Mock data
+let mockResidents: Resident[] = [...seedResidents];
 
 const mockCareRecords: CareRecord[] = [
   {
@@ -391,31 +349,74 @@ export const handlers = [
 
   // Residents endpoints
   http.get('/api/v1/residents', async ({ request }) => {
-    await delay(200);
+    await delay(150);
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const pageSize = parseInt(url.searchParams.get('pageSize') || '20');
-    const search = url.searchParams.get('search') || '';
+    const page = parseInt(url.searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(url.searchParams.get('pageSize') || url.searchParams.get('limit') || '20', 10);
+    const search = (url.searchParams.get('search') || url.searchParams.get('q') || '').trim().toLowerCase();
     const status = url.searchParams.get('status');
+    const hasThreePipeParam = url.searchParams.get('hasThreePipe');
+    const identityType = url.searchParams.get('identityType');
+    const dependencyLevel = url.searchParams.get('dependencyLevel');
+    const sortField = url.searchParams.get('sort') || 'residentId';
+    const sortOrder = url.searchParams.get('order') || 'asc';
 
     let filtered = [...mockResidents];
+
     if (search) {
-      filtered = filtered.filter(
-        (r) =>
-          r.name.includes(search) ||
-          r.residentId.includes(search) ||
-          r.insuranceId.includes(search)
-      );
+      filtered = filtered.filter((r) => {
+        const name = (r.name || '').toLowerCase();
+        const id = (r.residentId || '').toLowerCase();
+        const ins = (r.insuranceId || '').toLowerCase();
+        const bed = (r.bedNumber || '').toLowerCase();
+        return name.includes(search) || id.includes(search) || ins.includes(search) || bed.includes(search);
+      });
     }
+
     if (status) {
       filtered = filtered.filter((r) => r.status === status);
     }
 
-    return HttpResponse.json(createApiResponse(createPaginatedResponse(filtered, page, pageSize)));
+    if (hasThreePipeParam !== null && hasThreePipeParam !== undefined && hasThreePipeParam !== '') {
+      const isTrue = hasThreePipeParam === 'true';
+      filtered = filtered.filter((r) => Boolean(r.hasThreePipe) === isTrue);
+    }
+
+    if (identityType) {
+      filtered = filtered.filter((r) => r.identityType === identityType);
+    }
+
+    if (dependencyLevel) {
+      filtered = filtered.filter((r) => r.dependencyLevel === dependencyLevel);
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let valA = (a as unknown as Record<string, unknown>)[sortField] ?? '';
+      let valB = (b as unknown as Record<string, unknown>)[sortField] ?? '';
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return sortOrder === 'desc' ? valB.localeCompare(valA, 'zh-TW') : valA.localeCompare(b as unknown as string, 'zh-TW');
+      }
+      if (valA < valB) return sortOrder === 'desc' ? 1 : -1;
+      if (valA > valB) return sortOrder === 'desc' ? -1 : 1;
+      return 0;
+    });
+
+    const startIdx = (page - 1) * pageSize;
+    const paginatedItems = filtered.slice(startIdx, startIdx + pageSize);
+
+    return HttpResponse.json(createApiResponse({
+      items: paginatedItems,
+      total: filtered.length,
+      page,
+      pageSize,
+      totalPages: Math.ceil(filtered.length / pageSize) || 1,
+    }));
   }),
 
   http.get('/api/v1/residents/:id', async ({ params }) => {
-    await delay(150);
+    await delay(100);
     const resident = mockResidents.find((r) => r.residentId === params.id);
     if (!resident) {
       return HttpResponse.json(
@@ -427,29 +428,78 @@ export const handlers = [
   }),
 
   http.post('/api/v1/residents', async ({ request }) => {
-    await delay(300);
+    await delay(200);
     const body = await request.json() as Partial<Resident>;
+
+    const residentId = body.residentId?.trim() || `RES-${String(mockResidents.length + 1).padStart(3, '0')}`;
+
+    // Check unique ID
+    const exists = mockResidents.some((r) => r.residentId === residentId);
+    if (exists) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'DUPLICATE_RESIDENT_ID', message: `住民編號 ${residentId} 已存在` } },
+        { status: 400 }
+      );
+    }
+
+    // Check bed conflict for active residents
+    if (body.bedNumber && body.status !== 'Inactive') {
+      const occupied = mockResidents.find(
+        (r) => r.bedNumber === body.bedNumber && r.status === 'Active'
+      );
+      if (occupied) {
+        return HttpResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'BED_CONFLICT',
+              message: `床位 ${body.bedNumber} 已由住民 ${occupied.name} (${occupied.residentId}) 佔用`,
+            },
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    const pipes = body.pipes || parsePipesString(body.specialNeeds);
+    const hasThreePipe = body.hasThreePipe !== undefined ? body.hasThreePipe : isThreePipe(pipes);
+
+    const now = new Date().toISOString();
     const newResident: Resident = {
-      residentId: `RES-${String(mockResidents.length + 1).padStart(3, '0')}`,
+      residentId,
       name: body.name || '',
       gender: body.gender || 'Male',
-      dateOfBirth: body.dateOfBirth || '',
+      dateOfBirth: rocToIso(body.dateOfBirth || '') || '1950-01-01',
       address: body.address || '',
+      householdAddress: body.householdAddress || '',
+      phone: body.phone || '',
+      mobile: body.mobile || '',
       insuranceId: body.insuranceId || '',
       diagnosis: body.diagnosis || '',
-      admissionDate: body.admissionDate || '',
+      admissionDate: rocToIso(body.admissionDate || '') || (now.split('T')[0] as string),
       specialNeeds: body.specialNeeds || '',
-      status: 'Active',
-      hasThreePipe: body.hasThreePipe || false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      status: body.status || 'Active',
+      hasThreePipe,
+      bedNumber: body.bedNumber || '',
+      pipes,
+      identityType: body.identityType || '一般戶',
+      dependencyLevel: body.dependencyLevel || '部分依賴',
+      emergencyContact: body.emergencyContact || { name: '', relationship: '' },
+      education: body.education || '',
+      religion: body.religion || '',
+      workHistory: body.workHistory || '',
+      disability: body.disability || { raw: '' },
+      catastrophicIllness: body.catastrophicIllness || { raw: '' },
+      createdAt: now,
+      updatedAt: now,
     };
-    mockResidents.push(newResident);
+
+    mockResidents.unshift(newResident);
     return HttpResponse.json(createApiResponse(newResident), { status: 201 });
   }),
 
-  http.put('/api/v1/residents/:id', async ({ params, request }) => {
-    await delay(200);
+  http.patch('/api/v1/residents/:id', async ({ params, request }) => {
+    await delay(150);
     const index = mockResidents.findIndex((r) => r.residentId === params.id);
     if (index === -1) {
       return HttpResponse.json(
@@ -457,14 +507,48 @@ export const handlers = [
         { status: 404 }
       );
     }
+
     const body = await request.json() as Partial<Resident>;
-    const updated = { ...mockResidents[index], ...body, updatedAt: new Date().toISOString() } as Resident;
+    const current = mockResidents[index]!;
+
+    // Check bed conflict if changing bed
+    if (body.bedNumber && body.bedNumber !== current.bedNumber && body.status !== 'Inactive') {
+      const occupied = mockResidents.find(
+        (r) => r.bedNumber === body.bedNumber && r.status === 'Active' && r.residentId !== params.id
+      );
+      if (occupied) {
+        return HttpResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'BED_CONFLICT',
+              message: `床位 ${body.bedNumber} 已由住民 ${occupied.name} (${occupied.residentId}) 佔用`,
+            },
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    const pipes = body.pipes !== undefined ? body.pipes : current.pipes;
+    const hasThreePipe = body.hasThreePipe !== undefined ? body.hasThreePipe : (pipes ? isThreePipe(pipes) : current.hasThreePipe);
+
+    const updated: Resident = {
+      ...current,
+      ...body,
+      dateOfBirth: body.dateOfBirth ? rocToIso(body.dateOfBirth) : current.dateOfBirth,
+      admissionDate: body.admissionDate ? rocToIso(body.admissionDate) : current.admissionDate,
+      pipes,
+      hasThreePipe,
+      updatedAt: new Date().toISOString(),
+    };
+
     mockResidents[index] = updated;
     return HttpResponse.json(createApiResponse(updated));
   }),
 
-  http.delete('/api/v1/residents/:id', async ({ params }) => {
-    await delay(200);
+  http.put('/api/v1/residents/:id', async ({ params, request }) => {
+    await delay(150);
     const index = mockResidents.findIndex((r) => r.residentId === params.id);
     if (index === -1) {
       return HttpResponse.json(
@@ -472,8 +556,161 @@ export const handlers = [
         { status: 404 }
       );
     }
-    mockResidents.splice(index, 1);
-    return HttpResponse.json(createApiResponse({ success: true }));
+    const body = await request.json() as Partial<Resident>;
+    const current = mockResidents[index]!;
+    const pipes = body.pipes !== undefined ? body.pipes : current.pipes;
+    const hasThreePipe = body.hasThreePipe !== undefined ? body.hasThreePipe : isThreePipe(pipes);
+
+    const updated: Resident = {
+      ...current,
+      ...body,
+      dateOfBirth: body.dateOfBirth ? rocToIso(body.dateOfBirth) : current.dateOfBirth,
+      admissionDate: body.admissionDate ? rocToIso(body.admissionDate) : current.admissionDate,
+      pipes,
+      hasThreePipe,
+      updatedAt: new Date().toISOString(),
+    };
+    mockResidents[index] = updated;
+    return HttpResponse.json(createApiResponse(updated));
+  }),
+
+  http.delete('/api/v1/residents/:id', async ({ params, request }) => {
+    await delay(150);
+    const index = mockResidents.findIndex((r) => r.residentId === params.id);
+    if (index === -1) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: '住民不存在' } },
+        { status: 404 }
+      );
+    }
+
+    let reason = '已離院';
+    try {
+      const body = await request.json() as { reason?: string };
+      if (body?.reason) reason = body.reason;
+    } catch {
+      // Body may be empty on DELETE
+    }
+
+    mockResidents[index] = {
+      ...mockResidents[index]!,
+      status: 'Inactive',
+      inactiveReason: reason,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return HttpResponse.json(createApiResponse({ success: true, resident: mockResidents[index] }));
+  }),
+
+  http.post('/api/v1/residents/import', async ({ request }) => {
+    await delay(300);
+    const body = await request.json() as { data: Array<RawResidentJson | Partial<Resident>>; dryRun?: boolean };
+    const items = body.data || [];
+    const dryRun = Boolean(body.dryRun);
+
+    const previewResults: Array<{
+      row: number;
+      isValid: boolean;
+      errors: string[];
+      resident: Partial<Resident>;
+    }> = [];
+
+    const existingIds = new Set(mockResidents.map((r) => r.residentId));
+    const existingActiveBeds = new Set(
+      mockResidents.filter((r) => r.status === 'Active' && r.bedNumber).map((r) => r.bedNumber!)
+    );
+    const batchIds = new Set<string>();
+    const batchBeds = new Set<string>();
+
+    const validToImport: Resident[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const raw = items[i] as unknown as Record<string, string>;
+      const errors: string[] = [];
+
+      // Check if it's raw Chinese JSON format or standard Resident DTO
+      let resident: Resident;
+      if (raw['姓名'] || raw['序號'] || raw['身分證號']) {
+        resident = transformRawResident(raw as unknown as RawResidentJson, mockResidents.length + i);
+      } else {
+        const r = items[i] as Partial<Resident>;
+        const pipes = r.pipes || parsePipesString(r.specialNeeds);
+        resident = {
+          residentId: r.residentId || `RES-${String(mockResidents.length + i + 1).padStart(3, '0')}`,
+          name: r.name || '',
+          gender: r.gender || 'Male',
+          dateOfBirth: rocToIso(r.dateOfBirth || '') || '',
+          address: r.address || '',
+          householdAddress: r.householdAddress || '',
+          phone: r.phone || '',
+          mobile: r.mobile || '',
+          insuranceId: r.insuranceId || '',
+          diagnosis: r.diagnosis || '',
+          admissionDate: rocToIso(r.admissionDate || '') || (new Date().toISOString().split('T')[0] as string),
+          specialNeeds: r.specialNeeds || '',
+          status: r.status || 'Active',
+          hasThreePipe: r.hasThreePipe !== undefined ? r.hasThreePipe : isThreePipe(pipes),
+          bedNumber: r.bedNumber || '',
+          pipes,
+          identityType: r.identityType || '一般戶',
+          dependencyLevel: r.dependencyLevel || '部分依賴',
+          emergencyContact: r.emergencyContact || { name: '', relationship: '' },
+          education: r.education || '',
+          religion: r.religion || '',
+          workHistory: r.workHistory || '',
+          disability: r.disability || { raw: '' },
+          catastrophicIllness: r.catastrophicIllness || { raw: '' },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      if (!resident.name) {
+        errors.push('姓名為必填欄位');
+      }
+
+      if (resident.residentId) {
+        if (existingIds.has(resident.residentId) || batchIds.has(resident.residentId)) {
+          errors.push(`住民編號 ${resident.residentId} 重複`);
+        } else {
+          batchIds.add(resident.residentId);
+        }
+      }
+
+      if (resident.bedNumber) {
+        if (existingActiveBeds.has(resident.bedNumber) || batchBeds.has(resident.bedNumber)) {
+          errors.push(`床位 ${resident.bedNumber} 已被佔用`);
+        } else {
+          batchBeds.add(resident.bedNumber);
+        }
+      }
+
+      const isValid = errors.length === 0;
+      previewResults.push({
+        row: i + 1,
+        isValid,
+        errors,
+        resident,
+      });
+
+      if (isValid) {
+        validToImport.push(resident);
+      }
+    }
+
+    if (!dryRun) {
+      mockResidents = [...validToImport, ...mockResidents];
+    }
+
+    return HttpResponse.json(
+      createApiResponse({
+        dryRun,
+        total: items.length,
+        validCount: validToImport.length,
+        errorCount: items.length - validToImport.length,
+        items: previewResults,
+      })
+    );
   }),
 
   // Care Records endpoints

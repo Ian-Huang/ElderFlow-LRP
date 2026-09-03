@@ -5,6 +5,8 @@ import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ResidentsPage } from '@/pages/ResidentsPage';
 import { ResidentDetailPage } from '@/pages/ResidentDetailPage';
+import { ResidentFormPage } from '@/pages/ResidentFormPage';
+import { ResidentImportPage } from '@/pages/ResidentImportPage';
 import { CareRecordsPage } from '@/pages/CareRecordsPage';
 import { MedicationsPage } from '@/pages/MedicationsPage';
 import { CarePlansPage } from '@/pages/CarePlansPage';
@@ -57,7 +59,10 @@ export function App() {
       >
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="residents" element={<ResidentsPage />} />
+        <Route path="residents/new" element={<ResidentFormPage />} />
+        <Route path="residents/import" element={<ResidentImportPage />} />
         <Route path="residents/:id" element={<ResidentDetailPage />} />
+        <Route path="residents/:id/edit" element={<ResidentFormPage />} />
         <Route path="care-records" element={<CareRecordsPage />} />
         <Route path="care-records/new" element={<CareRecordsPage />} />
         <Route path="care-records/:id/edit" element={<CareRecordsPage />} />

@@ -1,18 +1,54 @@
 // 共用型別定義 - 從規格與 CONTEXT.md 提取
 
 // ========== 住民基本資料 ==========
+export interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone?: string;
+  mobile?: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface DisabilityInfo {
+  category?: string;
+  level?: string;
+  expiryDate?: string;
+  raw?: string;
+}
+
+export interface CatastrophicIllnessInfo {
+  name?: string;
+  expiryDate?: string;
+  raw?: string;
+}
+
 export interface Resident {
   residentId: string;
   name: string;
   gender: 'Male' | 'Female';
-  dateOfBirth: string; // ISO 8601
+  dateOfBirth: string; // ISO 8601 YYYY-MM-DD
   address: string;
-  insuranceId: string;
-  diagnosis: string;
-  admissionDate: string; // ISO 8601
-  specialNeeds: string;
+  householdAddress?: string;
+  phone?: string;
+  mobile?: string;
+  insuranceId: string; // 身分證號
+  diagnosis?: string;
+  admissionDate: string; // ISO 8601 YYYY-MM-DD
+  specialNeeds?: string;
   status: 'Active' | 'Inactive';
   hasThreePipe: boolean; // 鼻胃管、導尿管、氣切管
+  bedNumber?: string;
+  pipes?: string[];
+  identityType?: string;
+  dependencyLevel?: string;
+  emergencyContact?: EmergencyContact;
+  education?: string;
+  religion?: string;
+  workHistory?: string;
+  disability?: DisabilityInfo;
+  catastrophicIllness?: CatastrophicIllnessInfo;
+  inactiveReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,15 +58,30 @@ export interface ResidentCreateInput {
   gender: 'Male' | 'Female';
   dateOfBirth: string;
   address: string;
+  householdAddress?: string;
+  phone?: string;
+  mobile?: string;
   insuranceId: string;
-  diagnosis: string;
+  diagnosis?: string;
   admissionDate: string;
-  specialNeeds: string;
-  hasThreePipe: boolean;
+  specialNeeds?: string;
+  hasThreePipe?: boolean;
+  bedNumber?: string;
+  pipes?: string[];
+  identityType?: string;
+  dependencyLevel?: string;
+  emergencyContact?: EmergencyContact;
+  education?: string;
+  religion?: string;
+  workHistory?: string;
+  disability?: DisabilityInfo;
+  catastrophicIllness?: CatastrophicIllnessInfo;
 }
 
 export interface ResidentUpdateInput extends Partial<ResidentCreateInput> {
   residentId: string;
+  status?: 'Active' | 'Inactive';
+  inactiveReason?: string;
 }
 
 // ========== 日常照護記錄 ==========
@@ -363,11 +414,46 @@ export const ResidentCreateSchema = z.object({
   gender: z.enum(['Male', 'Female']),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式錯誤 (YYYY-MM-DD)'),
   address: z.string().min(1, '地址為必填').max(200),
-  insuranceId: z.string().min(1, '保險 ID 為必填').max(20),
+  householdAddress: z.string().max(200).optional(),
+  phone: z.string().max(30).optional(),
+  mobile: z.string().max(30).optional(),
+  insuranceId: z.string().min(1, '身分證號/保險 ID 為必填').max(20),
   diagnosis: z.string().max(500).optional(),
   admissionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式錯誤 (YYYY-MM-DD)'),
   specialNeeds: z.string().max(500).optional(),
   hasThreePipe: z.boolean().default(false),
+  bedNumber: z.string().max(20).optional(),
+  pipes: z.array(z.string()).optional(),
+  identityType: z.string().max(50).optional(),
+  dependencyLevel: z.string().max(50).optional(),
+  emergencyContact: z
+    .object({
+      name: z.string().optional(),
+      relationship: z.string().optional(),
+      phone: z.string().optional(),
+      mobile: z.string().optional(),
+      address: z.string().optional(),
+      notes: z.string().optional(),
+    })
+    .optional(),
+  education: z.string().optional(),
+  religion: z.string().optional(),
+  workHistory: z.string().optional(),
+  disability: z
+    .object({
+      category: z.string().optional(),
+      level: z.string().optional(),
+      expiryDate: z.string().optional(),
+      raw: z.string().optional(),
+    })
+    .optional(),
+  catastrophicIllness: z
+    .object({
+      name: z.string().optional(),
+      expiryDate: z.string().optional(),
+      raw: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const CareRecordCreateSchema = z.object({
