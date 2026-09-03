@@ -1,13 +1,12 @@
 import { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { offlineDb } from '@/utils/offlineDb';
+import { useResidents } from '@/hooks/useResidents';
 import { formatDate, calculateAge } from '@/utils/rocDate';
 import { ResidentInactiveModal } from '@/components/ResidentInactiveModal';
-import apiClient from '@/api/apiClient';
-import type { Resident, PaginatedResponse } from '@lrp/shared';
+import type { Resident } from '@lrp/shared';
 
 export function ResidentsPage() {
   const { hasRole } = useAuthStore();
@@ -49,81 +48,16 @@ export function ResidentsPage() {
     setSearchParams(next);
   };
 
-  // Fetch residents query
-  const queryKey = [
-    'residents',
-    { page, pageSize, search, statusFilter, threePipeFilter, identityTypeFilter, dependencyLevelFilter, sortField, sortOrder },
-  ];
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey,
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('pageSize', String(pageSize));
-      if (search) params.set('search', search);
-      if (statusFilter) params.set('status', statusFilter);
-      if (threePipeFilter) params.set('hasThreePipe', threePipeFilter);
-      if (identityTypeFilter) params.set('identityType', identityTypeFilter);
-      if (dependencyLevelFilter) params.set('dependencyLevel', dependencyLevelFilter);
-      params.set('sort', sortField);
-      params.set('order', sortOrder);
-
-      try {
-        const res = await apiClient.get<PaginatedResponse<Resident>>(`/residents?${params.toString()}`);
-        if (res.success && res.data) {
-          // Cache to IndexedDB for offline access
-          for (const item of res.data.items) {
-            await offlineDb.Residents.put({
-              ...item,
-              localId: item.residentId,
-              syncStatus: 'synced',
-              version: 1,
-              createdAt: item.createdAt || new Date().toISOString(),
-              updatedAt: item.updatedAt || new Date().toISOString(),
-            });
-          }
-          return res.data;
-        }
-        throw new Error(res.error?.message || '載入失敗');
-      } catch (err) {
-        // Fallback to IndexedDB
-        const offlineItems = await offlineDb.Residents.toArray();
-        let filtered = [...offlineItems];
-        if (search) {
-          const s = search.toLowerCase();
-          filtered = filtered.filter(
-            (r) =>
-              r.name.toLowerCase().includes(s) ||
-              r.residentId.toLowerCase().includes(s) ||
-              (r.bedNumber && r.bedNumber.toLowerCase().includes(s))
-          );
-        }
-        if (statusFilter) {
-          filtered = filtered.filter((r) => r.status === statusFilter);
-        }
-        if (threePipeFilter) {
-          const isTrue = threePipeFilter === 'true';
-          filtered = filtered.filter((r) => Boolean(r.hasThreePipe) === isTrue);
-        }
-        if (identityTypeFilter) {
-          filtered = filtered.filter((r) => r.identityType === identityTypeFilter);
-        }
-        if (dependencyLevelFilter) {
-          filtered = filtered.filter((r) => r.dependencyLevel === dependencyLevelFilter);
-        }
-
-        const start = (page - 1) * pageSize;
-        const items = filtered.slice(start, start + pageSize);
-        return {
-          items,
-          total: filtered.length,
-          page,
-          pageSize,
-          totalPages: Math.ceil(filtered.length / pageSize) || 1,
-        };
-      }
-    },
+  const { data, isLoading, isError } = useResidents({
+    page,
+    pageSize,
+    search,
+    status: statusFilter,
+    hasThreePipe: threePipeFilter,
+    identityType: identityTypeFilter,
+    dependencyLevel: dependencyLevelFilter,
+    sortField,
+    sortOrder,
   });
 
   const residents = useMemo(() => data?.items || [], [data]);

@@ -81,6 +81,11 @@
   - 資安維護與稽核軌跡補充（專責人員權限分離、設備安全管理紀錄）
 - **業務規則**：四大模組必須在第一期同時實施；所有相關紀錄必須留存至少 5 年；系統必須提供完整的稽核軌跡以備查核
 
+### 離線優先資源庫 (Offline-First Resource Repository)
+- **定義**：封裝網路請求、本機 IndexedDB 快取、通用離線查詢評估與 SyncQueue 樂觀派送的領域資料存取深模組，向 UI 提供一致的資料操作介面
+- **關鍵模組**：ResidentRepository, MedicationRepository, CareRecordRepository, BaseOfflineRepository
+- **業務規則**：連線時採 Network-First 並自動背景快取；離線時無縫切換本機 Dexie 查詢；寫入時執行樂觀更新並排入 SyncQueue，連線時自動背景觸發同步 (對應 BR008)
+
 ## 實體關係
 
 ```
