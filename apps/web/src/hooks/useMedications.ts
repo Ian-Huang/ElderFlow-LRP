@@ -26,6 +26,15 @@ export function useMedicationDetail(id: string | undefined) {
   });
 }
 
+export function useMedicationAlertSummary() {
+  const isOnline = useSyncStore((state) => state.isOnline);
+
+  return useQuery({
+    queryKey: ['medication-alerts', { isOnline }],
+    queryFn: () => medicationRepository.getAlertSummary({ isOnline }),
+  });
+}
+
 export function useCreateMedication() {
   const queryClient = useQueryClient();
   const isOnline = useSyncStore((state) => state.isOnline);

@@ -182,4 +182,84 @@ describe('BaseOfflineRepository', () => {
     expect(queue[0]?.entityType).toBe('Residents');
     expect(queue[0]?.operation).toBe('create');
   });
+
+  it('update() should set SyncQueue localId identical to the entity ID', async () => {
+    await offlineDb.Residents.put({
+      residentId: 'res-999',
+      localId: 'res-999',
+      name: '舊名稱',
+      gender: 'Male',
+      dateOfBirth: '1940-01-01',
+      address: '台北市',
+      insuranceId: 'A123',
+      admissionDate: '2025-01-01',
+      status: 'Active',
+      hasThreePipe: false,
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+
+    const repo = createOfflineRepository<TestResource, TestCreateInput, TestUpdateInput>(mockConfig);
+    await repo.update('res-999', { residentId: 'res-999', name: '新名稱' }, { isOnline: false });
+
+    const queue = await offlineDb.SyncQueue.toArray();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]?.localId).toBe('res-999');
+    expect(queue[0]?.entityId).toBe('res-999');
+
+    const inDb = await offlineDb.Residents.get('res-999');
+    expect(inDb?.name).toBe('新名稱');
+    expect(inDb?.syncStatus).toBe('pending');
+  });
+
+  it('list() should not overwrite local pending changes with stale server data', async () => {
+    // Local has pending changes
+    await offlineDb.Residents.put({
+      residentId: 'res-888',
+      localId: 'res-888',
+      name: '本機離線修改中',
+      gender: 'Male',
+      dateOfBirth: '1940-01-01',
+      address: '台北市',
+      insuranceId: 'A123',
+      admissionDate: '2025-01-01',
+      status: 'Active',
+      hasThreePipe: false,
+      syncStatus: 'pending',
+      version: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+
+    // Server returns older/different state
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      success: true,
+      data: {
+        items: [
+          {
+            residentId: 'res-888',
+            name: '伺服器舊資料',
+            status: 'Active',
+            hasThreePipe: false,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
+      },
+    });
+
+    const repo = createOfflineRepository<TestResource, TestCreateInput, TestUpdateInput>(mockConfig);
+    await repo.list({ isOnline: true });
+
+    // Local in Dexie should still preserve '本機離線修改中' and 'pending'
+    const inDb = await offlineDb.Residents.get('res-888');
+    expect(inDb?.name).toBe('本機離線修改中');
+    expect(inDb?.syncStatus).toBe('pending');
+  });
 });

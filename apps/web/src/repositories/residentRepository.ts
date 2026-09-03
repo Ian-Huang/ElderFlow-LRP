@@ -3,7 +3,7 @@ import { offlineDb } from '@/utils/offlineDb';
 import { createOfflineRepository, type BaseOfflineRepository, type RepositoryListParams } from './baseRepository';
 
 export interface ResidentListParams extends RepositoryListParams<Resident> {
-  status?: string;
+  status?: 'Active' | 'Inactive';
   hasThreePipe?: boolean | string;
   identityType?: string;
   dependencyLevel?: string;
@@ -11,6 +11,12 @@ export interface ResidentListParams extends RepositoryListParams<Resident> {
 
 export interface ResidentRepository extends BaseOfflineRepository<Resident, ResidentCreateInput, ResidentUpdateInput> {
   list: (params?: ResidentListParams) => ReturnType<BaseOfflineRepository<Resident, ResidentCreateInput, ResidentUpdateInput>['list']>;
+  toggleStatus: (
+    id: string,
+    status: 'Active' | 'Inactive',
+    reason?: string,
+    options?: { isOnline?: boolean }
+  ) => Promise<Resident>;
   setInactive: (id: string, reason: string, options?: { isOnline?: boolean }) => Promise<Resident>;
 }
 
@@ -53,25 +59,22 @@ export const residentRepository: ResidentRepository = {
     return baseRepo.list({
       ...params,
       filters,
-      extraQueryParams: {
-        ...(params.extraQueryParams || {}),
-        status: params.status,
-        hasThreePipe: params.hasThreePipe !== undefined ? String(params.hasThreePipe) : undefined,
-        identityType: params.identityType,
-        dependencyLevel: params.dependencyLevel,
-      },
     });
   },
 
-  async setInactive(id: string, reason: string, options = {}) {
+  async toggleStatus(id, status, reason = '', options = {}) {
     return baseRepo.update(
       id,
       {
         residentId: id,
-        status: 'Inactive',
+        status,
         inactiveReason: reason,
       },
       options
     );
+  },
+
+  async setInactive(id, reason, options = {}) {
+    return this.toggleStatus(id, 'Inactive', reason, options);
   },
 };

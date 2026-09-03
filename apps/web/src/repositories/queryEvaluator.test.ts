@@ -31,6 +31,20 @@ describe('evaluateInMemoryQuery', () => {
     expect(result.items[1]?.id).toBe('2');
   });
 
+  it('should correctly paginate on page 2 when pageSize is omitted (defaults to 10)', () => {
+    const first = sampleItems[0]!;
+    const manyItems: TestItem[] = Array.from({ length: 25 }, (_, i) => ({
+      ...first,
+      id: String(i + 1),
+      name: `住民 ${i + 1}`,
+    }));
+    const result = evaluateInMemoryQuery<TestItem>(manyItems, { page: 2 });
+    expect(result.items).toHaveLength(10);
+    expect(result.page).toBe(2);
+    expect(result.pageSize).toBe(10);
+    expect(result.items[0]?.id).toBe('11');
+  });
+
   it('should filter items by exact match criteria', () => {
     const result = evaluateInMemoryQuery<TestItem>(sampleItems, {
       filters: { status: 'Inactive' },

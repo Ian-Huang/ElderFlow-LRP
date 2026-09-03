@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { CareRecord, CareRecordStatus, PaginatedResponse, Resident } from '@lrp/shared';
-import apiClient from '@/api/apiClient';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useOfflineMutation } from '@/hooks/useOfflineMutation';
+import { residentRepository } from '@/repositories/residentRepository';
+import { careRecordRepository, calculateCareRecordLockCountdown } from '@/repositories/careRecordRepository';
 import { calculateCareRecordCompleteness, type CareRecordActivityDraft } from '@/utils/careRecordScore';
 
 const ACTIVITY_OPTIONS: Array<{ value: CareRecord['activities'][number]['type']; label: string }> = [
@@ -77,22 +78,6 @@ function getStatusMeta(status: CareRecordStatus) {
   return { dot: 'bg-danger-500', label: '需驗證', badge: 'badge-danger' };
 }
 
-function calculateLockCountdown(submittedAt: string) {
-  const submitted = new Date(submittedAt).getTime();
-  const lockAt = submitted + 24 * 60 * 60 * 1000;
-  const remainingMs = lockAt - Date.now();
-  if (remainingMs <= 0) {
-    return { locked: true, text: '已鎖定' };
-  }
-
-  const hours = Math.floor(remainingMs / (1000 * 60 * 60));
-  const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-  return {
-    locked: false,
-    text: `${hours} 小時 ${minutes} 分後鎖定`,
-  };
-}
-
 function formatDateTime(date: string) {
   return new Date(date).toLocaleString('zh-TW', {
     year: 'numeric',
@@ -162,7 +147,7 @@ export function CareRecordsPage() {
     [form]
   );
 
-  const lockInfo = useMemo(() => calculateLockCountdown(form.submittedAt), [form.submittedAt]);
+  const lockInfo = useMemo(() => calculateCareRecordLockCountdown(form.submittedAt), [form.submittedAt]);
   const isLocked = form.lockType === 'Locked' || lockInfo.locked;
 
   useEffect(() => {
@@ -172,9 +157,11 @@ export function CareRecordsPage() {
   }, [form.evidence]);
 
   const loadResidents = async () => {
-    const response = await apiClient.get<PaginatedResponse<Resident>>('/residents', { page: 1, pageSize: 200 });
-    if (response.success && response.data) {
-      setResidents(response.data.items);
+    try {
+      const response = await residentRepository.list({ page: 1, pageSize: 200, isOnline });
+      setResidents(response.items);
+    } catch {
+      // Ignored: fallback handled inside repository
     }
   };
 
@@ -182,19 +169,16 @@ export function CareRecordsPage() {
     setLoadingList(true);
     setError(null);
     try {
-      const response = await apiClient.get<PaginatedResponse<CareRecord>>('/care-records', {
+      const response = await careRecordRepository.list({
         page: filters.page,
         pageSize: filters.pageSize,
         residentId: filters.residentId || undefined,
-        status: filters.status || undefined,
+        status: (filters.status as CareRecordStatus) || undefined,
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
+        isOnline,
       });
-
-      if (!response.success || !response.data) {
-        throw new Error(response.error?.message || '讀取照護記錄失敗');
-      }
-      setRecords(response.data);
+      setRecords(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : '讀取照護記錄失敗');
     } finally {
@@ -206,11 +190,10 @@ export function CareRecordsPage() {
     setLoadingDetail(true);
     setError(null);
     try {
-      const response = await apiClient.get<CareRecord>(`/care-records/${recordId}`);
-      if (!response.success || !response.data) {
-        throw new Error(response.error?.message || '讀取照護記錄失敗');
+      const record = await careRecordRepository.getById(recordId, { isOnline });
+      if (!record) {
+        throw new Error('讀取照護記錄失敗');
       }
-      const record = response.data;
       setForm({
         recordId: record.recordId,
         residentId: record.residentId,
@@ -304,31 +287,7 @@ export function CareRecordsPage() {
       };
     },
     mutationFn: async (payload) => {
-      if (!navigator.onLine) {
-        return {
-          recordId: `LOCAL-${crypto.randomUUID()}`,
-          residentId: payload.residentId,
-          timestamp: payload.timestamp,
-          activities: payload.activities,
-          staffId: payload.staffId,
-          staffName: payload.staffName,
-          completenessScore: scoreResult.score,
-          status: form.status,
-          evidence: payload.evidence,
-          notes: payload.notes,
-          submittedAt: new Date().toISOString(),
-          lockType: 'Editable',
-          modificationHistory: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-      }
-
-      const response = await apiClient.post<CareRecord>('/care-records', payload);
-      if (!response.success || !response.data) {
-        throw new Error(response.error?.message || '建立照護記錄失敗');
-      }
-      return response.data;
+      return careRecordRepository.create(payload, { isOnline });
     },
   });
 
@@ -367,31 +326,7 @@ export function CareRecordsPage() {
       version: 1,
     }),
     mutationFn: async (payload) => {
-      if (!navigator.onLine) {
-        return {
-          recordId: payload.recordId,
-          residentId: form.residentId,
-          timestamp: payload.timestamp,
-          activities: payload.activities,
-          staffId: user?.userId || 'unknown',
-          staffName: user?.name || '未知使用者',
-          completenessScore: scoreResult.score,
-          status: payload.status,
-          evidence: payload.evidence,
-          notes: payload.notes,
-          submittedAt: form.submittedAt,
-          lockType: form.lockType,
-          modificationHistory: [],
-          createdAt: form.submittedAt,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-
-      const response = await apiClient.patch<CareRecord>(`/care-records/${payload.recordId}`, payload);
-      if (!response.success || !response.data) {
-        throw new Error(response.error?.message || '更新照護記錄失敗');
-      }
-      return response.data;
+      return careRecordRepository.update(payload.recordId, payload, { isOnline });
     },
   });
 
@@ -579,10 +514,11 @@ export function CareRecordsPage() {
   const handleStatusChange = async (recordId: string, status: CareRecordStatus) => {
     setError(null);
     try {
-      const response = await apiClient.post<CareRecord>(`/care-records/${recordId}/status`, { status });
-      if (!response.success) {
-        throw new Error(response.error?.message || '狀態更新失敗');
-      }
+      await careRecordRepository.update(
+        recordId,
+        { recordId, status },
+        { isOnline }
+      );
       await loadCareRecords();
     } catch (err) {
       setError(err instanceof Error ? err.message : '狀態更新失敗');
@@ -599,20 +535,21 @@ export function CareRecordsPage() {
     setError(null);
     setFeedback(null);
     try {
-      const response = await apiClient.post<CareRecord>(`/care-records/${params.id}/supplement`, {
-        supplementContent: supplement.content,
-        reason: supplement.reason,
-        staffId: user?.userId || 'unknown',
-        staffName: user?.name || '未知使用者',
-      });
+      const updated = await careRecordRepository.applySupplement(
+        {
+          recordId: params.id,
+          supplementContent: supplement.content,
+          reason: supplement.reason,
+          staffId: user?.userId || 'unknown',
+          staffName: user?.name || '未知使用者',
+        },
+        { isOnline }
+      );
 
-      if (!response.success || !response.data) {
-        throw new Error(response.error?.message || '建立補充修正失敗');
-      }
-
-      setFeedback(`補充修正已建立：${response.data.recordId}`);
+      setFeedback(`補充修正已建立：${updated.recordId}`);
       setSupplement({ content: '', reason: '' });
-      navigate(`/care-records/${response.data.recordId}/edit`);
+      await loadCareRecordDetail(updated.recordId);
+      navigate(`/care-records/${updated.recordId}/edit`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '建立補充修正失敗');
     }

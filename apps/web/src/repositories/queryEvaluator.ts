@@ -17,7 +17,7 @@ export function evaluateInMemoryQuery<T extends object>(
 ): PaginatedResponse<T> {
   const {
     page = 1,
-    pageSize = items.length || 10,
+    pageSize = 10,
     search = '',
     searchFields = [],
     filters = {},

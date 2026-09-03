@@ -1,5 +1,6 @@
 import type {
   CareRecord,
+  CareRecordStatus,
   CareRecordCreateInput,
   CareRecordUpdateInput,
   SupplementRecordInput,
@@ -11,13 +12,46 @@ import { createOfflineRepository, type BaseOfflineRepository, type RepositoryLis
 
 export interface CareRecordListParams extends RepositoryListParams<CareRecord> {
   residentId?: string;
-  status?: string;
+  status?: CareRecordStatus;
   staffId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface LockStatusResult {
+  locked: boolean;
+  text: string;
+  remainingMs: number;
+}
+
+export function calculateCareRecordLockCountdown(submittedAt: string): LockStatusResult {
+  const submitted = new Date(submittedAt).getTime();
+  const lockAt = submitted + 24 * 60 * 60 * 1000;
+  const remainingMs = lockAt - Date.now();
+  if (remainingMs <= 0) {
+    return { locked: true, text: '已鎖定', remainingMs: 0 };
+  }
+
+  const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+  const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+  return {
+    locked: false,
+    text: `${hours} 小時 ${minutes} 分後鎖定`,
+    remainingMs,
+  };
+}
+
+export function isCareRecordLocked(record: CareRecord): boolean {
+  if (record.lockType === 'Locked') return true;
+  if (!record.submittedAt) return false;
+  return calculateCareRecordLockCountdown(record.submittedAt).locked;
 }
 
 export interface CareRecordRepository extends BaseOfflineRepository<CareRecord, CareRecordCreateInput, CareRecordUpdateInput> {
   list: (params?: CareRecordListParams) => ReturnType<BaseOfflineRepository<CareRecord, CareRecordCreateInput, CareRecordUpdateInput>['list']>;
   applySupplement: (payload: SupplementRecordInput, options?: { isOnline?: boolean }) => Promise<CareRecord>;
+  getLockStatus: (record: CareRecord) => LockStatusResult;
+  isLocked: (record: CareRecord) => boolean;
 }
 
 const baseRepo = createOfflineRepository<CareRecord, CareRecordCreateInput, CareRecordUpdateInput>({
@@ -78,6 +112,14 @@ const baseRepo = createOfflineRepository<CareRecord, CareRecordCreateInput, Care
 export const careRecordRepository: CareRecordRepository = {
   ...baseRepo,
 
+  getLockStatus(record) {
+    return calculateCareRecordLockCountdown(record.submittedAt);
+  },
+
+  isLocked(record) {
+    return isCareRecordLocked(record);
+  },
+
   async list(params = {}) {
     const filters: Record<string, unknown> = {
       ...(params.filters || {}),
@@ -90,11 +132,21 @@ export const careRecordRepository: CareRecordRepository = {
     return baseRepo.list({
       ...params,
       filters,
-      extraQueryParams: {
-        ...(params.extraQueryParams || {}),
-        residentId: params.residentId,
-        status: params.status,
-        staffId: params.staffId,
+      customFilter: (record) => {
+        if (params.startDate) {
+          const start = new Date(params.startDate).getTime();
+          const itemTime = new Date(record.timestamp).getTime();
+          if (itemTime < start) return false;
+        }
+        if (params.endDate) {
+          const end = new Date(params.endDate).getTime();
+          const itemTime = new Date(record.timestamp).getTime();
+          if (itemTime > end) return false;
+        }
+        if (params.customFilter) {
+          return params.customFilter(record);
+        }
+        return true;
       },
     });
   },
@@ -122,12 +174,14 @@ export const careRecordRepository: CareRecordRepository = {
       ? `${record.notes}\n[補充紀錄 ${now.split('T')[0]}]: ${payload.supplementContent}`
       : `[補充紀錄 ${now.split('T')[0]}]: ${payload.supplementContent}`;
 
+    // Fix: pass modificationHistory into baseRepo.update so it is stored in Dexie and queued in SyncQueue!
     const updated = await baseRepo.update(
       payload.recordId,
       {
         recordId: payload.recordId,
         notes: updatedNotes,
-      },
+        modificationHistory: updatedHistory,
+      } as unknown as CareRecordUpdateInput,
       options
     );
 

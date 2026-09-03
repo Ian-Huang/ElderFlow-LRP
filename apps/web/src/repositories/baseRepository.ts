@@ -8,7 +8,6 @@ import { evaluateInMemoryQuery, type QueryEvaluatorOptions } from './queryEvalua
 
 export interface RepositoryListParams<T> extends QueryEvaluatorOptions<T> {
   isOnline?: boolean;
-  extraQueryParams?: Record<string, string | number | boolean | undefined>;
 }
 
 export interface BaseOfflineRepositoryConfig<
@@ -37,6 +36,10 @@ export interface BaseOfflineRepository<
   delete: (id: string, options?: { isOnline?: boolean }) => Promise<void>;
 }
 
+function resolveOnlineStatus(explicitStatus?: boolean): boolean {
+  return explicitStatus ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+}
+
 export function createOfflineRepository<
   TEntity extends object,
   TCreateInput extends object = Record<string, unknown>,
@@ -56,7 +59,7 @@ export function createOfflineRepository<
 
   return {
     async list(params = {}) {
-      const isOnline = params.isOnline ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+      const isOnline = resolveOnlineStatus(params.isOnline);
 
       if (isOnline) {
         try {
@@ -75,31 +78,27 @@ export function createOfflineRepository<
             }
           }
 
-          if (params.extraQueryParams) {
-            for (const [key, val] of Object.entries(params.extraQueryParams)) {
-              if (val !== undefined && val !== null && val !== '') {
-                urlParams.set(key, String(val));
-              }
-            }
-          }
-
           const queryString = urlParams.toString();
           const endpoint = queryString ? `${apiBasePath}?${queryString}` : apiBasePath;
           const res = await apiClient.get<PaginatedResponse<TEntity>>(endpoint);
 
           if (res.success && res.data) {
-            // Background cache items in Dexie
+            // Background cache items in Dexie, but preserve local pending changes!
             for (const item of res.data.items) {
               const entityId = String((item as Record<string, unknown>)[idField as string] || '');
               if (entityId) {
-                await table.put({
-                  ...item,
-                  localId: entityId,
-                  syncStatus: 'synced',
-                  version: 1,
-                  createdAt: ((item as Record<string, unknown>).createdAt as string) || new Date().toISOString(),
-                  updatedAt: ((item as Record<string, unknown>).updatedAt as string) || new Date().toISOString(),
-                });
+                const existingLocal = await table.get(entityId);
+                // Do not overwrite un-synced offline edits with stale server state!
+                if (!existingLocal || existingLocal.syncStatus !== 'pending') {
+                  await table.put({
+                    ...item,
+                    localId: entityId,
+                    syncStatus: 'synced',
+                    version: 1,
+                    createdAt: ((item as Record<string, unknown>).createdAt as string) || new Date().toISOString(),
+                    updatedAt: ((item as Record<string, unknown>).updatedAt as string) || new Date().toISOString(),
+                  });
+                }
               }
             }
             return res.data;
@@ -124,19 +123,22 @@ export function createOfflineRepository<
     },
 
     async getById(id, options = {}) {
-      const isOnline = options.isOnline ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+      const isOnline = resolveOnlineStatus(options.isOnline);
 
       if (isOnline) {
         try {
           const res = await apiClient.get<TEntity>(`${apiBasePath}/${id}`);
           if (res.success && res.data) {
-            await table.put({
-              ...res.data,
-              localId: id,
-              syncStatus: 'synced',
-              version: 1,
-              updatedAt: new Date().toISOString(),
-            });
+            const existingLocal = await table.get(id);
+            if (!existingLocal || existingLocal.syncStatus !== 'pending') {
+              await table.put({
+                ...res.data,
+                localId: id,
+                syncStatus: 'synced',
+                version: 1,
+                updatedAt: new Date().toISOString(),
+              });
+            }
             return res.data;
           }
         } catch {
@@ -149,7 +151,7 @@ export function createOfflineRepository<
     },
 
     async create(payload, options = {}) {
-      const isOnline = options.isOnline ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+      const isOnline = resolveOnlineStatus(options.isOnline);
       const localId = crypto.randomUUID();
       const now = new Date().toISOString();
       const syncStatus: OfflineSyncStatus = 'pending';
@@ -186,7 +188,7 @@ export function createOfflineRepository<
     },
 
     async update(id, payload, options = {}) {
-      const isOnline = options.isOnline ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+      const isOnline = resolveOnlineStatus(options.isOnline);
       const now = new Date().toISOString();
       const existing = (await table.get(id)) as TEntity | undefined;
 
@@ -209,8 +211,9 @@ export function createOfflineRepository<
         updatedAt: now,
       });
 
+      // Crucial fix: SyncQueue.localId must match the entity's localId in Dexie table!
       await offlineDb.SyncQueue.put({
-        localId: crypto.randomUUID(),
+        localId: id,
         entityType,
         entityId: id,
         operation: 'update',
@@ -230,13 +233,13 @@ export function createOfflineRepository<
     },
 
     async delete(id, options = {}) {
-      const isOnline = options.isOnline ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+      const isOnline = resolveOnlineStatus(options.isOnline);
       const now = new Date().toISOString();
 
       await table.delete(id);
 
       await offlineDb.SyncQueue.put({
-        localId: crypto.randomUUID(),
+        localId: id,
         entityType,
         entityId: id,
         operation: 'delete',

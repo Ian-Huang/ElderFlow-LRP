@@ -1,6 +1,6 @@
 # 規格：離線優先資源庫模組深化 (Deepen Offline-First Resource Repositories)
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

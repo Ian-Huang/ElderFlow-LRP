@@ -197,5 +197,58 @@ describe('Domain Repositories', () => {
       const inDb = await offlineDb.CareRecords.get(record.recordId);
       expect(inDb).toBeDefined();
     });
+
+    it('should apply supplement and persist modificationHistory in Dexie and SyncQueue', async () => {
+      const record = await careRecordRepository.create(
+        {
+          residentId: 'R01',
+          timestamp: '2026-09-03T10:00:00Z',
+          staffId: 'S01',
+          staffName: '照服員阿強',
+          notes: '原始備註',
+          activities: [
+            {
+              type: 'Meal',
+              timestamp: '2026-09-03T10:00:00Z',
+              assistanceLevel: 'PartialAssist',
+              notes: '早餐進食正常',
+            },
+          ],
+        },
+        { isOnline: false }
+      );
+
+      const supplemented = await careRecordRepository.applySupplement(
+        {
+          recordId: record.recordId,
+          supplementContent: '晚間補充體溫 36.8 度',
+          reason: '漏填體溫',
+          staffId: 'S02',
+          staffName: '護理師小美',
+        },
+        { isOnline: false }
+      );
+
+      expect(supplemented.modificationHistory).toHaveLength(1);
+      expect(supplemented.modificationHistory[0]?.fieldName).toBe('supplementContent');
+      expect(supplemented.modificationHistory[0]?.newValue).toBe('晚間補充體溫 36.8 度');
+
+      const inDb = await offlineDb.CareRecords.get(record.recordId);
+      expect(inDb?.modificationHistory).toHaveLength(1);
+      expect(inDb?.modificationHistory?.[0]?.reason).toBe('漏填體溫');
+    });
+
+    it('should correctly evaluate 24-hour lock status and countdown', () => {
+      const recent = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(); // 2 hours ago
+      const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(); // 25 hours ago
+
+      const recentLock = careRecordRepository.getLockStatus({ submittedAt: recent } as any);
+      expect(recentLock.locked).toBe(false);
+      expect(recentLock.text).toContain('小時');
+
+      const oldLock = careRecordRepository.getLockStatus({ submittedAt: old } as any);
+      expect(oldLock.locked).toBe(true);
+      expect(oldLock.text).toBe('已鎖定');
+    });
   });
 });

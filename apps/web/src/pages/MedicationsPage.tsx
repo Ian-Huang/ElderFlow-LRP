@@ -1,27 +1,16 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
-import { useSyncStore } from '@/stores/syncStore';
-import { useMedications } from '@/hooks/useMedications';
+import { useMedications, useMedicationAlertSummary } from '@/hooks/useMedications';
+import { useResidents } from '@/hooks/useResidents';
 import { formatDateTime } from '@/utils/rocDate';
 import { FREQUENCY_LABELS } from '@/utils/medicationScheduler';
 import { MedicationAdministerModal } from '@/components/MedicationAdministerModal';
-import apiClient from '@/api/apiClient';
-import type { Medication, Resident, PaginatedResponse } from '@lrp/shared';
-
-interface LowStockAlertsSummary {
-  total: number;
-  normalCount: number;
-  runningLowCount: number;
-  outOfStockCount: number;
-  items: Medication[];
-}
+import type { Medication } from '@lrp/shared';
 
 export function MedicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasRole } = useAuthStore();
-  const { isOnline } = useSyncStore();
   const canManage = hasRole(['caregiver', 'supervisor', 'admin', 'sysadmin']);
 
   const searchQuery = searchParams.get('q') || '';
@@ -35,33 +24,21 @@ export function MedicationsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [administerTargetMed, setAdministerTargetMed] = useState<Medication | null>(null);
 
-  // Fetch low stock summary for top banner
-  const { data: alertSummary } = useQuery<LowStockAlertsSummary>({
-    queryKey: ['medication-alerts'],
-    queryFn: async () => {
-      const res = await apiClient.get<LowStockAlertsSummary>('/medications/alerts/low-stock');
-      return res.data || { total: 0, normalCount: 0, runningLowCount: 0, outOfStockCount: 0, items: [] };
-    },
-    enabled: isOnline,
-  });
+  // Fetch low stock summary for top banner via repository hook (works online and offline)
+  const { data: alertSummary } = useMedicationAlertSummary();
 
-  // Fetch residents for dropdown
-  const { data: residentsList } = useQuery({
-    queryKey: ['residents-dropdown'],
-    queryFn: async () => {
-      const res = await apiClient.get<PaginatedResponse<Resident>>('/residents', {
-        pageSize: 100,
-        status: 'Active',
-      });
-      return res.data?.items || [];
-    },
+  // Fetch residents for dropdown via deep resident repository hook (works offline too)
+  const { data: residentsData } = useResidents({
+    pageSize: 100,
+    status: 'Active',
   });
+  const residentsList = residentsData?.items || [];
 
   // Fetch medications list via deep medication repository hook
   const { data: medicationsData, isLoading } = useMedications({
     search: searchQuery,
     residentId: selectedResidentId || undefined,
-    status: selectedStatus || undefined,
+    status: (selectedStatus as 'Active' | 'Discontinued' | 'OnHold') || undefined,
     lowStockOnly,
     page,
     pageSize: 12,

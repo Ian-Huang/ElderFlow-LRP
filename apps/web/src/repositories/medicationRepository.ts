@@ -6,13 +6,20 @@ import type {
   MedicationAdministration,
 } from '@lrp/shared';
 import { offlineDb } from '@/utils/offlineDb';
-import { useSyncStore } from '@/stores/syncStore';
-import { triggerSyncNow } from '@/utils/syncEngine';
+import apiClient from '@/api/apiClient';
 import { createOfflineRepository, type BaseOfflineRepository, type RepositoryListParams } from './baseRepository';
+
+export interface LowStockAlertsSummary {
+  total: number;
+  normalCount: number;
+  runningLowCount: number;
+  outOfStockCount: number;
+  items: Medication[];
+}
 
 export interface MedicationListParams extends RepositoryListParams<Medication> {
   residentId?: string;
-  status?: string;
+  status?: 'Active' | 'Discontinued' | 'OnHold';
   lowStockOnly?: boolean;
 }
 
@@ -22,6 +29,7 @@ export interface MedicationRepository extends BaseOfflineRepository<Medication, 
     payload: MedicationAdministrationCreateInput,
     options?: { isOnline?: boolean }
   ) => Promise<Medication>;
+  getAlertSummary: (options?: { isOnline?: boolean }) => Promise<LowStockAlertsSummary>;
 }
 
 const baseRepo = createOfflineRepository<Medication, MedicationCreateInput, MedicationUpdateInput>({
@@ -71,17 +79,10 @@ export const medicationRepository: MedicationRepository = {
         }
         return true;
       },
-      extraQueryParams: {
-        ...(params.extraQueryParams || {}),
-        residentId: params.residentId,
-        status: params.status,
-        lowStock: params.lowStockOnly ? 'true' : undefined,
-      },
     });
   },
 
   async administer(payload, options = {}) {
-    const isOnline = options.isOnline ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
     const now = new Date().toISOString();
     const med = (await offlineDb.Medications.get(payload.medicationId)) as Medication | undefined;
 
@@ -106,41 +107,48 @@ export const medicationRepository: MedicationRepository = {
       createdAt: now,
     };
 
-    const updatedMed: Medication = {
-      ...med,
-      stockLevel: newStockLevel,
-      lastAdministered: now,
-      administrationHistory: [administrationEntry, ...(med.administrationHistory || [])],
-      updatedAt: now,
-    };
-
-    await offlineDb.Medications.put({
-      ...updatedMed,
-      localId: payload.medicationId,
-      syncStatus: 'pending',
-      version: 1,
-    });
-
-    await offlineDb.SyncQueue.put({
-      localId: crypto.randomUUID(),
-      entityType: 'Medications',
-      entityId: payload.medicationId,
-      operation: 'update',
-      payload: {
-        ...updatedMed,
+    // Re-use baseRepo.update to guarantee localId consistency and avoid code duplication
+    const updatedMed = await baseRepo.update(
+      payload.medicationId,
+      {
+        medicationId: payload.medicationId,
+        stockLevel: newStockLevel,
+        lastAdministered: now,
+        administrationHistory: [administrationEntry, ...(med.administrationHistory || [])],
         newAdministration: administrationEntry,
-      },
-      retryCount: 0,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    useSyncStore.getState().incrementPendingChanges();
-
-    if (isOnline) {
-      void triggerSyncNow();
-    }
+      } as unknown as MedicationUpdateInput,
+      options
+    );
 
     return updatedMed;
+  },
+
+  async getAlertSummary(options = {}) {
+    const isOnline = options.isOnline ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+    if (isOnline) {
+      try {
+        const res = await apiClient.get<LowStockAlertsSummary>('/medications/alerts/low-stock');
+        if (res.success && res.data) {
+          return res.data;
+        }
+      } catch {
+        // Fallback to offline evaluation
+      }
+    }
+
+    const allMeds = ((await offlineDb.Medications.toArray()) as Medication[]) || [];
+    const outOfStockItems = allMeds.filter((m) => m.stockLevel === 0);
+    const runningLowItems = allMeds.filter((m) => m.stockLevel > 0 && m.stockLevel <= (m.reorderThreshold ?? 15));
+    const normalItems = allMeds.filter((m) => m.stockLevel > (m.reorderThreshold ?? 15));
+    const lowStockItems = [...outOfStockItems, ...runningLowItems];
+
+    return {
+      total: lowStockItems.length,
+      normalCount: normalItems.length,
+      runningLowCount: runningLowItems.length,
+      outOfStockCount: outOfStockItems.length,
+      items: lowStockItems,
+    };
   },
 };

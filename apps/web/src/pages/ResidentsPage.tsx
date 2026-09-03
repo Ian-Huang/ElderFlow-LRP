@@ -52,7 +52,7 @@ export function ResidentsPage() {
     page,
     pageSize,
     search,
-    status: statusFilter,
+    status: (statusFilter as 'Active' | 'Inactive') || undefined,
     hasThreePipe: threePipeFilter,
     identityType: identityTypeFilter,
     dependencyLevel: dependencyLevelFilter,
@@ -81,7 +81,7 @@ export function ResidentsPage() {
       r.dateOfBirth,
       r.bedNumber || '',
       r.hasThreePipe ? '是' : '否',
-      r.status === 'Active' ? '住住中' : '已離院',
+      r.status === 'Active' ? '入住中' : '已離院',
       r.identityType || '',
       r.dependencyLevel || '',
       r.admissionDate,
@@ -169,7 +169,7 @@ export function ResidentsPage() {
                 className="input text-sm"
               >
                 <option value="">所有狀態</option>
-                <option value="Active">住住中</option>
+                <option value="Active">入住中</option>
                 <option value="Inactive">已離院</option>
               </select>
 
@@ -370,7 +370,7 @@ export function ResidentsPage() {
                     <td className="px-4 py-3">
                       {r.status === 'Active' ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                          住住中
+                          入住中
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
@@ -460,7 +460,7 @@ export function ResidentsPage() {
                   <div>
                     {r.status === 'Active' ? (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                        住住中
+                        入住中
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
