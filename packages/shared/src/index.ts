@@ -166,7 +166,14 @@ export interface SupplementRecordInput {
 }
 
 // ========== 藥物管理 ==========
-export type MedicationFrequency = 'OnceDaily' | 'TwiceDaily' | 'ThreeTimesDaily' | 'AsNeeded';
+export type MedicationFrequency =
+  | 'OnceDaily'
+  | 'TwiceDaily'
+  | 'ThreeTimesDaily'
+  | 'FourTimesDaily'
+  | 'AsNeeded';
+
+export type MedicationStockStatus = 'Normal' | 'RunningLow' | 'OutOfStock';
 
 export interface Medication {
   medicationId: string;
@@ -179,8 +186,12 @@ export interface Medication {
   nextScheduled: string;
   stockLevel: number;
   reorderThreshold: number; // 預設 15
+  stockStatus?: MedicationStockStatus;
   status: 'Active' | 'Discontinued' | 'OnHold';
   notes: string;
+  residentName?: string;
+  bedNumber?: string;
+  administrationHistory?: MedicationAdministration[];
   createdAt: string;
   updatedAt: string;
 }
@@ -192,8 +203,9 @@ export interface MedicationCreateInput {
   frequency: MedicationFrequency;
   schedule: string[];
   stockLevel: number;
-  reorderThreshold: number;
-  notes: string;
+  reorderThreshold?: number;
+  status?: 'Active' | 'Discontinued' | 'OnHold';
+  notes?: string;
 }
 
 export interface MedicationUpdateInput extends Partial<MedicationCreateInput> {
@@ -208,8 +220,18 @@ export interface MedicationAdministration {
   actualTime: string;
   administeredBy: string;
   status: 'Administered' | 'Missed' | 'Refused' | 'Held';
-  notes: string;
+  notes?: string;
   createdAt: string;
+}
+
+export interface MedicationAdministrationCreateInput {
+  medicationId: string;
+  residentId: string;
+  scheduledTime?: string;
+  actualTime?: string;
+  administeredBy: string;
+  status?: 'Administered' | 'Missed' | 'Refused' | 'Held';
+  notes?: string;
 }
 
 // ========== 照護計畫 ==========
@@ -474,10 +496,21 @@ export const MedicationCreateSchema = z.object({
   residentId: z.string().min(1, '住民 ID 為必填'),
   name: z.string().min(1, '藥物名稱必填').max(100),
   dosage: z.string().min(1, '劑量必填').max(50),
-  frequency: z.enum(['OnceDaily', 'TwiceDaily', 'ThreeTimesDaily', 'AsNeeded']),
-  schedule: z.array(z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/)).min(1),
+  frequency: z.enum(['OnceDaily', 'TwiceDaily', 'ThreeTimesDaily', 'FourTimesDaily', 'AsNeeded']),
+  schedule: z.array(z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/)).default([]),
   stockLevel: z.number().int().min(0),
   reorderThreshold: z.number().int().min(0).default(15),
+  status: z.enum(['Active', 'Discontinued', 'OnHold']).default('Active'),
+  notes: z.string().max(500).optional(),
+});
+
+export const MedicationAdministrationSchema = z.object({
+  medicationId: z.string().min(1, '藥物 ID 為必填'),
+  residentId: z.string().min(1, '住民 ID 為必填'),
+  scheduledTime: z.string().optional(),
+  actualTime: z.string().optional(),
+  administeredBy: z.string().min(1, '執行人員為必填'),
+  status: z.enum(['Administered', 'Missed', 'Refused', 'Held']).default('Administered'),
   notes: z.string().max(500).optional(),
 });
 

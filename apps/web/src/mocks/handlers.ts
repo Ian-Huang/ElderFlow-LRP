@@ -12,7 +12,14 @@ import type {
   ComplianceCheck,
   Report,
   SyncConflict,
+  MedicationAdministration,
 } from '@lrp/shared';
+import { mockMedicationsSeed } from './medicationSeedData';
+import {
+  calculateNextScheduled,
+  getMedicationStockStatus,
+  isDuplicateAdministration,
+} from '@/utils/medicationScheduler';
 
 // Mock data
 const mockUsers: User[] = [
@@ -92,40 +99,7 @@ const mockCareRecords: CareRecord[] = [
   },
 ];
 
-const mockMedications: Medication[] = [
-  {
-    medicationId: 'MED-001',
-    residentId: 'RES-001',
-    name: '降壓錠',
-    dosage: '10mg',
-    frequency: 'OnceDaily',
-    schedule: ['08:00'],
-    lastAdministered: '2024-01-15T08:15:00+08:00',
-    nextScheduled: '2024-01-16T08:00:00+08:00',
-    stockLevel: 25,
-    reorderThreshold: 15,
-    status: 'Active',
-    notes: '早餐前服用',
-    createdAt: '2023-06-01T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-  {
-    medicationId: 'MED-002',
-    residentId: 'RES-001',
-    name: '糖尿病藥物',
-    dosage: '500mg',
-    frequency: 'TwiceDaily',
-    schedule: ['08:00', '20:00'],
-    lastAdministered: '2024-01-15T08:15:00+08:00',
-    nextScheduled: '2024-01-15T20:00:00+08:00',
-    stockLevel: 12,
-    reorderThreshold: 15,
-    status: 'Active',
-    notes: '飯前服用，庫存偏低',
-    createdAt: '2023-06-01T00:00:00Z',
-    updatedAt: '2024-01-15T00:00:00Z',
-  },
-];
+let mockMedications: Medication[] = [...mockMedicationsSeed];
 
 const mockCarePlans: CarePlan[] = [
   {
@@ -914,16 +888,60 @@ export const handlers = [
   }),
 
   // Medications endpoints
+  http.get('/api/v1/medications/alerts/low-stock', async () => {
+    await delay(100);
+    const enriched = mockMedications.map((m) => {
+      const res = mockResidents.find((r) => r.residentId === m.residentId);
+      const stockStatus = getMedicationStockStatus(m.stockLevel, m.reorderThreshold);
+      return {
+        ...m,
+        residentName: m.residentName || res?.name || '未知住民',
+        bedNumber: m.bedNumber || res?.bedNumber || '未排床',
+        stockStatus,
+      };
+    });
+
+    const normalCount = enriched.filter((m) => m.stockStatus === 'Normal').length;
+    const runningLowCount = enriched.filter((m) => m.stockStatus === 'RunningLow').length;
+    const outOfStockCount = enriched.filter((m) => m.stockStatus === 'OutOfStock').length;
+    const lowStockItems = enriched
+      .filter((m) => m.stockStatus !== 'Normal')
+      .sort((a, b) => a.stockLevel - b.stockLevel);
+
+    return HttpResponse.json(
+      createApiResponse({
+        total: enriched.length,
+        normalCount,
+        runningLowCount,
+        outOfStockCount,
+        items: lowStockItems,
+      })
+    );
+  }),
+
   http.get('/api/v1/medications', async ({ request }) => {
     await delay(200);
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const pageSize = parseInt(url.searchParams.get('pageSize') || '20');
+    const page = parseInt(url.searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(url.searchParams.get('pageSize') || '20', 10);
     const residentId = url.searchParams.get('residentId');
     const status = url.searchParams.get('status');
     const lowStock = url.searchParams.get('lowStock');
+    const search = (url.searchParams.get('search') || url.searchParams.get('q') || '').trim().toLowerCase();
+    const sortBy = url.searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = url.searchParams.get('sortOrder') || 'desc';
 
-    let filtered = [...mockMedications];
+    let filtered = mockMedications.map((m) => {
+      const res = mockResidents.find((r) => r.residentId === m.residentId);
+      const stockStatus = getMedicationStockStatus(m.stockLevel, m.reorderThreshold);
+      return {
+        ...m,
+        residentName: m.residentName || res?.name || '未知住民',
+        bedNumber: m.bedNumber || res?.bedNumber || '未排床',
+        stockStatus,
+      };
+    });
+
     if (residentId) {
       filtered = filtered.filter((m) => m.residentId === residentId);
     }
@@ -933,6 +951,33 @@ export const handlers = [
     if (lowStock === 'true') {
       filtered = filtered.filter((m) => m.stockLevel <= m.reorderThreshold);
     }
+    if (search) {
+      filtered = filtered.filter(
+        (m) =>
+          m.name.toLowerCase().includes(search) ||
+          m.dosage.toLowerCase().includes(search) ||
+          (m.residentName && m.residentName.toLowerCase().includes(search)) ||
+          (m.bedNumber && m.bedNumber.toLowerCase().includes(search)) ||
+          (m.notes && m.notes.toLowerCase().includes(search))
+      );
+    }
+
+    filtered.sort((a, b) => {
+      if (sortBy === 'stockLevel') {
+        return sortOrder === 'asc' ? a.stockLevel - b.stockLevel : b.stockLevel - a.stockLevel;
+      }
+      if (sortBy === 'nextScheduled') {
+        const timeA = new Date(a.nextScheduled).getTime();
+        const timeB = new Date(b.nextScheduled).getTime();
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      if (sortBy === 'name') {
+        return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      }
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+    });
 
     return HttpResponse.json(createApiResponse(createPaginatedResponse(filtered, page, pageSize)));
   }),
@@ -946,29 +991,76 @@ export const handlers = [
         { status: 404 }
       );
     }
-    return HttpResponse.json(createApiResponse(med));
+    const res = mockResidents.find((r) => r.residentId === med.residentId);
+    const enriched = {
+      ...med,
+      residentName: med.residentName || res?.name || '未知住民',
+      bedNumber: med.bedNumber || res?.bedNumber || '未排床',
+      stockStatus: getMedicationStockStatus(med.stockLevel, med.reorderThreshold),
+      administrationHistory: med.administrationHistory || [],
+    };
+    return HttpResponse.json(createApiResponse(enriched));
   }),
 
   http.post('/api/v1/medications', async ({ request }) => {
     await delay(300);
-    const body = await request.json() as Partial<Medication>;
+    const body = (await request.json()) as Partial<Medication>;
+    const res = mockResidents.find((r) => r.residentId === body.residentId);
+    const schedule = body.schedule || [];
+    const nextScheduled = body.nextScheduled || calculateNextScheduled(schedule);
+    const stockLevel = Number(body.stockLevel ?? 0);
+    const reorderThreshold = Number(body.reorderThreshold ?? 15);
+
     const newMed: Medication = {
       medicationId: `MED-${String(mockMedications.length + 1).padStart(3, '0')}`,
       residentId: body.residentId || '',
+      residentName: res?.name || body.residentName || '未知住民',
+      bedNumber: res?.bedNumber || body.bedNumber || '未排床',
       name: body.name || '',
       dosage: body.dosage || '',
       frequency: body.frequency || 'OnceDaily',
-      schedule: body.schedule || [],
-      nextScheduled: body.nextScheduled || new Date().toISOString(),
-      stockLevel: body.stockLevel || 0,
-      reorderThreshold: body.reorderThreshold || 15,
-      status: 'Active',
+      schedule,
+      nextScheduled,
+      stockLevel,
+      reorderThreshold,
+      stockStatus: getMedicationStockStatus(stockLevel, reorderThreshold),
+      status: body.status || 'Active',
       notes: body.notes || '',
+      administrationHistory: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    mockMedications.push(newMed);
+    mockMedications = [newMed, ...mockMedications];
     return HttpResponse.json(createApiResponse(newMed), { status: 201 });
+  }),
+
+  http.patch('/api/v1/medications/:id', async ({ params, request }) => {
+    await delay(200);
+    const index = mockMedications.findIndex((m) => m.medicationId === params.id);
+    if (index === -1) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: '藥物不存在' } },
+        { status: 404 }
+      );
+    }
+    const body = (await request.json()) as Partial<Medication>;
+    const current = mockMedications[index]!;
+    const schedule = body.schedule ?? current.schedule;
+    const stockLevel = body.stockLevel !== undefined ? Number(body.stockLevel) : current.stockLevel;
+    const reorderThreshold =
+      body.reorderThreshold !== undefined ? Number(body.reorderThreshold) : current.reorderThreshold;
+
+    const updated: Medication = {
+      ...current,
+      ...body,
+      schedule,
+      stockLevel,
+      reorderThreshold,
+      stockStatus: getMedicationStockStatus(stockLevel, reorderThreshold),
+      updatedAt: new Date().toISOString(),
+    };
+    mockMedications[index] = updated;
+    return HttpResponse.json(createApiResponse(updated));
   }),
 
   http.put('/api/v1/medications/:id', async ({ params, request }) => {
@@ -980,10 +1072,176 @@ export const handlers = [
         { status: 404 }
       );
     }
-    const body = await request.json() as Partial<Medication>;
-    const updated = { ...mockMedications[index], ...body, updatedAt: new Date().toISOString() } as Medication;
+    const body = (await request.json()) as Partial<Medication>;
+    const current = mockMedications[index]!;
+    const schedule = body.schedule ?? current.schedule;
+    const stockLevel = body.stockLevel !== undefined ? Number(body.stockLevel) : current.stockLevel;
+    const reorderThreshold =
+      body.reorderThreshold !== undefined ? Number(body.reorderThreshold) : current.reorderThreshold;
+
+    const updated: Medication = {
+      ...current,
+      ...body,
+      schedule,
+      stockLevel,
+      reorderThreshold,
+      stockStatus: getMedicationStockStatus(stockLevel, reorderThreshold),
+      updatedAt: new Date().toISOString(),
+    };
     mockMedications[index] = updated;
     return HttpResponse.json(createApiResponse(updated));
+  }),
+
+  http.delete('/api/v1/medications/:id', async ({ params }) => {
+    await delay(200);
+    const index = mockMedications.findIndex((m) => m.medicationId === params.id);
+    if (index === -1) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: '藥物不存在' } },
+        { status: 404 }
+      );
+    }
+    const current = mockMedications[index]!;
+    const updated: Medication = {
+      ...current,
+      status: 'Discontinued',
+      updatedAt: new Date().toISOString(),
+    };
+    mockMedications[index] = updated;
+    return HttpResponse.json(createApiResponse(updated));
+  }),
+
+  http.post('/api/v1/medications/:id/administer', async ({ params, request }) => {
+    await delay(250);
+    const index = mockMedications.findIndex((m) => m.medicationId === params.id);
+    if (index === -1) {
+      return HttpResponse.json(
+        { success: false, error: { code: 'NOT_FOUND', message: '藥物不存在' } },
+        { status: 404 }
+      );
+    }
+
+    const body = (await request.json()) as {
+      administeredBy?: string;
+      scheduledTime?: string;
+      actualTime?: string;
+      status?: 'Administered' | 'Missed' | 'Refused' | 'Held';
+      notes?: string;
+    };
+
+    const current = mockMedications[index]!;
+    const adminStatus = body.status || 'Administered';
+    const actualTime = body.actualTime || new Date().toISOString();
+    const scheduledTime = body.scheduledTime || current.nextScheduled;
+
+    // 只有 Administered 狀態才扣減庫存
+    const newStock =
+      adminStatus === 'Administered' ? Math.max(0, current.stockLevel - 1) : current.stockLevel;
+    const nextScheduled = calculateNextScheduled(current.schedule);
+
+    const newAdmin: MedicationAdministration = {
+      administrationId: `ADM-${crypto.randomUUID()}`,
+      medicationId: current.medicationId,
+      residentId: current.residentId,
+      scheduledTime,
+      actualTime,
+      administeredBy: body.administeredBy || '護理人員',
+      status: adminStatus,
+      notes: body.notes || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    const history = current.administrationHistory ? [newAdmin, ...current.administrationHistory] : [newAdmin];
+
+    const updatedMed: Medication = {
+      ...current,
+      stockLevel: newStock,
+      stockStatus: getMedicationStockStatus(newStock, current.reorderThreshold),
+      lastAdministered: adminStatus === 'Administered' ? actualTime : current.lastAdministered,
+      nextScheduled,
+      administrationHistory: history,
+      updatedAt: new Date().toISOString(),
+    };
+
+    mockMedications[index] = updatedMed;
+
+    return HttpResponse.json(
+      createApiResponse({
+        medication: updatedMed,
+        administration: newAdmin,
+      }),
+      { status: 201 }
+    );
+  }),
+
+  http.post('/api/v1/medications/sync', async ({ request }) => {
+    await delay(250);
+    const body = (await request.json()) as {
+      operations: Array<{
+        payload: {
+          medicationId: string;
+          residentId: string;
+          actualTime?: string;
+          scheduledTime?: string;
+          administeredBy?: string;
+          status?: 'Administered' | 'Missed' | 'Refused' | 'Held';
+          notes?: string;
+        };
+      }>;
+    };
+
+    const accepted: Array<{ localId: string; entityType: string; entityId: string; serverVersion: number }> = [];
+
+    (body.operations || []).forEach((op, idx) => {
+      const payload = op.payload;
+      const medIndex = mockMedications.findIndex((m) => m.medicationId === payload.medicationId);
+
+      if (medIndex !== -1) {
+        const med = mockMedications[medIndex]!;
+        const existingHistory = med.administrationHistory || [];
+
+        // 檢查 30 分鐘內去重
+        const isDupe = existingHistory.some((existing) =>
+          isDuplicateAdministration(existing, payload)
+        );
+
+        if (!isDupe) {
+          const adminStatus = payload.status || 'Administered';
+          const newStock =
+            adminStatus === 'Administered' ? Math.max(0, med.stockLevel - 1) : med.stockLevel;
+          const newAdmin: MedicationAdministration = {
+            administrationId: `ADM-SYNC-${idx + 1}-${Date.now()}`,
+            medicationId: med.medicationId,
+            residentId: med.residentId,
+            scheduledTime: payload.scheduledTime || med.nextScheduled,
+            actualTime: payload.actualTime || new Date().toISOString(),
+            administeredBy: payload.administeredBy || '離線照護員',
+            status: adminStatus,
+            notes: payload.notes || '',
+            createdAt: new Date().toISOString(),
+          };
+
+          mockMedications[medIndex] = {
+            ...med,
+            stockLevel: newStock,
+            stockStatus: getMedicationStockStatus(newStock, med.reorderThreshold),
+            lastAdministered:
+              adminStatus === 'Administered' ? newAdmin.actualTime : med.lastAdministered,
+            administrationHistory: [newAdmin, ...existingHistory],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      }
+
+      accepted.push({
+        localId: `med-local-${idx + 1}`,
+        entityType: 'Medications',
+        entityId: payload.medicationId || `MED-SYNC-${idx + 1}`,
+        serverVersion: 2,
+      });
+    });
+
+    return HttpResponse.json(createApiResponse({ accepted, conflicts: [] }));
   }),
 
   // Care Plans endpoints

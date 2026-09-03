@@ -9,6 +9,8 @@ import { ResidentFormPage } from '@/pages/ResidentFormPage';
 import { ResidentImportPage } from '@/pages/ResidentImportPage';
 import { CareRecordsPage } from '@/pages/CareRecordsPage';
 import { MedicationsPage } from '@/pages/MedicationsPage';
+import { MedicationDetailPage } from '@/pages/MedicationDetailPage';
+import { MedicationFormPage } from '@/pages/MedicationFormPage';
 import { CarePlansPage } from '@/pages/CarePlansPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
@@ -67,6 +69,9 @@ export function App() {
         <Route path="care-records/new" element={<CareRecordsPage />} />
         <Route path="care-records/:id/edit" element={<CareRecordsPage />} />
         <Route path="medications" element={<MedicationsPage />} />
+        <Route path="medications/new" element={<MedicationFormPage />} />
+        <Route path="medications/:id" element={<MedicationDetailPage />} />
+        <Route path="medications/:id/edit" element={<MedicationFormPage />} />
         <Route path="care-plans" element={<CarePlansPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />
