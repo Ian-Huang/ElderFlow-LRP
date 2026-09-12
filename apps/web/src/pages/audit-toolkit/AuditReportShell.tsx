@@ -27,7 +27,7 @@ export interface AuditReportShellProps {
  * 通用 A4 評鑑報表外殼元件，提供：
  * - 擬真 A4 紙張預覽（portrait / landscape 動態切換）
  * - 頂部工具列：下載 CSV 範本、匯入 CSV、立即列印
- * - contenteditable 標題點擊直接編輯
+ * - contenteditable 標題點擊直接編輯（以 local state 管理，避免 re-render 覆蓋）
  * - 檔案選取器整合 CsvParserEngine
  * - 動態資料筆數顯示
  *
@@ -36,6 +36,8 @@ export interface AuditReportShellProps {
 export function AuditReportShell({ config, rows, onImport }: AuditReportShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  // Local title state: prevents React re-render from overwriting user's contenteditable edits
+  const [title, setTitle] = useState(config.title);
 
   // -------------------------------------------------------------------------
   // A4 page style injected per instance (so portrait/landscape can coexist)
@@ -61,7 +63,8 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
     a.href = url;
     a.download = `${config.id}-範本.csv`;
     a.click();
-    URL.revokeObjectURL(url);
+    // Defer revocation so async download has time to start
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }, [config]);
 
   // -------------------------------------------------------------------------
@@ -139,7 +142,7 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
             下載 CSV 範本
           </button>
 
-          {/* Import CSV */}
+          {/* Import CSV — file input paired with visible label via aria-labelledby */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -149,13 +152,15 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
             <UploadIcon className="w-4 h-4" />
             匯入 CSV
           </button>
+          {/* tabIndex={-1}: programmatically activated only, so aria-hidden is safe */}
           <input
             ref={fileInputRef}
             type="file"
             accept=".csv,text/csv"
             onChange={handleFileChange}
             className="sr-only"
-            aria-hidden="true"
+            tabIndex={-1}
+            aria-label="選取 CSV 檔案"
           />
 
           {/* Print */}
@@ -173,15 +178,16 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
 
       {/* A4 Sheet Preview */}
       <div className={sheetClass} data-testid="a4-sheet">
-        {/* Report header */}
+        {/* Report header — contenteditable title backed by local state */}
         <div className="text-center mb-4">
           <h1
             data-testid="report-title"
             contentEditable="true"
             suppressContentEditableWarning
+            onBlur={(e) => setTitle(e.currentTarget.textContent ?? config.title)}
             className="text-xl font-bold text-gray-900 border-b-2 border-transparent hover:border-gray-300 focus:border-primary-400 focus:outline-none px-1 py-0.5 rounded transition-colors cursor-text"
           >
-            {config.title}
+            {title}
           </h1>
         </div>
 
@@ -210,11 +216,13 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
                   colSpan={config.columns.length}
                   className="border border-black px-2 py-4 text-center text-gray-400 text-xs"
                 >
-                  尚無資料 — 請使用上方工具列匯入 CSV 或新增一筆
+                  尚無資料 — 請使用上方工具列匯入 CSV 檔案
                 </td>
               </tr>
             ) : (
               rows.map((row, rowIdx) => (
+                // rowIdx is acceptable here: rows are append-only in this component
+                // and have no stable domain ID at the shell level
                 <tr key={rowIdx}>
                   {config.columns.map((col) => (
                     <td

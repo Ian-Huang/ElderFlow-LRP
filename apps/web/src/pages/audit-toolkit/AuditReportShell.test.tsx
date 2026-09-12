@@ -160,7 +160,7 @@ describe('AuditReportShell CSV 匯入', () => {
     );
   });
 
-  it('CSV 缺少必填欄位時呼叫 onImport 帶空陣列（防呆）', async () => {
+  it('CSV 缺少必填欄位時不呼叫 onImport，顯示錯誤提示', async () => {
     const onImport = vi.fn();
     // Use config with required column not in CSV
     const strictConfig: AuditReportConfig = {
@@ -195,8 +195,10 @@ describe('AuditReportShell CSV 匯入', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    // Should show error, not call onImport with data
-    expect(onImport).not.toHaveBeenCalledWith(expect.arrayContaining([expect.any(Object)]));
+    // onImport must not be called; error alert must be visible
+    expect(onImport).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('匯入失敗');
   });
 });
 

@@ -68,12 +68,24 @@
    螢幕預覽：模擬 A4 紙張外觀
    ----------------------------------------------------------------------- */
 @media screen {
-  .a4-sheet {
-    /* A4 @ 96 DPI: 210mm ≈ 794px, 297mm ≈ 1123px */
+  .a4-sheet.a4-portrait {
+    /* A4 Portrait @ 96 DPI: 210mm ≈ 794px, 297mm ≈ 1123px */
     width: 794px;
     min-height: 1123px;
     margin: 24px auto;
     padding: 14mm 10mm;
+    background: #fff;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.18);
+    border: 1px solid #e5e7eb;
+    box-sizing: border-box;
+  }
+
+  .a4-sheet.a4-landscape {
+    /* A4 Landscape @ 96 DPI: 297mm ≈ 1123px wide, 210mm ≈ 794px tall */
+    width: 1123px;
+    min-height: 794px;
+    margin: 24px auto;
+    padding: 10mm 14mm;
     background: #fff;
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.18);
     border: 1px solid #e5e7eb;
