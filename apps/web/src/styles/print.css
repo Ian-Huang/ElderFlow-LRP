@@ -2,23 +2,18 @@
  * 共用 A4 列印樣式規範 (Shared A4 Print Styles)
  *
  * 本檔案封裝評鑑報表工具箱所需的全域列印規則：
- * - A4 紙張尺寸與邊距設定
  * - 隱藏非列印元素（工具列、按鈕等）
  * - 防止表格行跨頁截斷
  * - 表頭（thead）跨頁自動重現
- * - 移除印前元素（背景、陰影、邊框）
+ * - 移除印前裝飾（陰影、邊框）
  *
- * 使用方式：在需要 A4 列印能力的頁面元件中 import 此檔案，
+ * 使用方式：
+ *   import '@/styles/print.css';
  * 並在對應元素上加上 `.a4-sheet`、`.no-print` class。
+ *
+ * 注意：`@page` 規格（size、margin）必須由各報表元件透過行內 <style> 注入，
+ * 以支援直向（portrait）與橫向（landscape）並存。本檔案不設定全域 @page。
  */
-
-/* -------------------------------------------------------------------------
-   A4 頁面設定
-   ----------------------------------------------------------------------- */
-@page {
-  size: A4 portrait;
-  margin: 14mm 10mm 14mm 10mm;
-}
 
 /* -------------------------------------------------------------------------
    列印媒體規則
@@ -45,31 +40,20 @@
     background: transparent !important;
   }
 
-  /* 防止表格行跨頁截斷（確保行整行位於同一頁） */
-  tr {
+  /* 防止表格行跨頁截斷（確保行整行位於同一頁）
+     .a4-sheet 限定，避免影響頁面其他表格 */
+  .a4-sheet tr {
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
   /* 表頭跨頁自動重現 */
-  thead {
+  .a4-sheet thead {
     display: table-header-group;
   }
 
-  /* 防止 thead 的行被截斷 */
-  thead tr {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
-  /* 防止 tbody 的行被截斷 */
-  tbody tr {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
-  /* 表格本身不分頁截斷 */
-  table {
+  /* 表格寬度與邊框重置（限定 .a4-sheet 內） */
+  .a4-sheet table {
     border-collapse: collapse;
     width: 100%;
   }
@@ -77,13 +61,6 @@
   /* 超連結不展開顯示 URL */
   a[href]::after {
     content: none !important;
-  }
-
-  /* 確保文字顏色為黑色（廉價黑白印表機相容） */
-  .a4-sheet * {
-    color: #000 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 }
 

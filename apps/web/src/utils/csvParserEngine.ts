@@ -6,6 +6,11 @@
  * 2. 依欄位規格動態產出 Excel 相容 UTF-8 BOM CSV 範本
  *
  * 完全不依賴瀏覽器 DOM 或 React，可在 Node / Vitest 環境下直接測試。
+ *
+ * 使用方式：
+ *   import { CsvParserEngine } from './csvParserEngine';
+ *   const result = CsvParserEngine.parse(csvText, config);
+ *   const template = CsvParserEngine.generateTemplate(config);
  */
 
 // ---------------------------------------------------------------------------
@@ -22,7 +27,7 @@ export interface ColumnSpec {
   required: boolean;
 }
 
-/** 報表設定契約 */
+/** 報表設定契約（CSV 解析所需的最小形狀；UI 屬性由呼叫端持有） */
 export interface AuditReportConfig {
   id: string;
   title: string;
@@ -64,6 +69,14 @@ function tokenize(raw: string): string[][] {
   let inQuotes = false;
   let i = 0;
 
+  /** 結束目前的 cell 並開始新的 row */
+  function commitRow(): void {
+    row.push(cell);
+    cell = '';
+    rows.push(row);
+    row = [];
+  }
+
   while (i < text.length) {
     const ch = text[i];
 
@@ -90,17 +103,12 @@ function tokenize(raw: string): string[][] {
         cell = '';
         i++;
       } else if (ch === '\r' && text[i + 1] === '\n') {
-        // CRLF
-        row.push(cell);
-        cell = '';
-        rows.push(row);
-        row = [];
+        // CRLF：前進 2 個字元
+        commitRow();
         i += 2;
       } else if (ch === '\n') {
-        row.push(cell);
-        cell = '';
-        rows.push(row);
-        row = [];
+        // LF
+        commitRow();
         i++;
       } else {
         cell += ch;
@@ -130,7 +138,7 @@ function escapeCell(value: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Public API — exported as a namespace object
 // ---------------------------------------------------------------------------
 
 /**
@@ -138,12 +146,15 @@ function escapeCell(value: string): string {
  *
  * @param csvText  原始 CSV 文字（可含 UTF-8 BOM、CRLF/LF、引號轉義）
  * @param config   報表設定（提供欄位規格與必填規則）
- * @returns        Result<T[], ParseError>
+ * @returns        Result<Record<string, string>[], ParseError>
+ *
+ * 注意：回傳型別為 Record<string, string>[] 而非任意 T，
+ * 以確保類型安全（呼叫端自行窄化至領域型別）。
  */
-export function parseRecordsCsv<T extends Record<string, string>>(
+function parse(
   csvText: string,
-  config: AuditReportConfig,
-): Result<T[], ParseError> {
+  config: Pick<AuditReportConfig, 'columns'>,
+): Result<Record<string, string>[], ParseError> {
   // 完全空白輸入 → 空陣列
   if (!csvText.trim()) {
     return { ok: true, value: [] };
@@ -182,13 +193,14 @@ export function parseRecordsCsv<T extends Record<string, string>>(
   }
 
   // 映射資料列
+  // RFC 4180：未加引號的值 trim 前後空白；加引號的值已在 tokenize 中保留原始值
   const records = dataRows.map((row) => {
     const record: Record<string, string> = {};
     for (const col of config.columns) {
       const idx = labelToIndex.get(col.label);
-      record[col.key] = idx !== undefined ? (row[idx] ?? '').trim() : '';
+      record[col.key] = idx !== undefined ? (row[idx] ?? '') : '';
     }
-    return record as T;
+    return record;
   });
 
   return { ok: true, value: records };
@@ -197,13 +209,15 @@ export function parseRecordsCsv<T extends Record<string, string>>(
 /**
  * 依欄位規格動態產出 CSV 範本文字。
  * - 以 `\uFEFF` (UTF-8 BOM) 開頭，確保 Excel 正確識別繁體中文
+ * - 行分隔符採 RFC 4180 規定的 CRLF（`\r\n`）以確保跨平台 Excel 相容
  * - 標頭列後若 `config.sampleData` 非空則附加示範資料列
  *
  * @param config   報表設定
  * @returns        含 BOM 之 CSV 字串
  */
-export function generateTemplate(config: AuditReportConfig): string {
+function generateTemplate(config: Pick<AuditReportConfig, 'columns' | 'sampleData'>): string {
   const BOM = '\uFEFF';
+  const CRLF = '\r\n';
 
   // 標頭列
   const headerLine = config.columns.map((col) => escapeCell(col.label)).join(',');
@@ -214,5 +228,16 @@ export function generateTemplate(config: AuditReportConfig): string {
   );
 
   const allLines = [headerLine, ...dataLines];
-  return BOM + allLines.join('\n');
+  return BOM + allLines.join(CRLF);
 }
+
+/** CsvParserEngine 命名空間物件（與規格介面對齊） */
+export const CsvParserEngine = {
+  parse,
+  generateTemplate,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Also export functions directly for destructured import patterns
+// ---------------------------------------------------------------------------
+export { parse as parseRecordsCsv, generateTemplate };

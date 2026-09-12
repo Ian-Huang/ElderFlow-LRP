@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseRecordsCsv,
-  generateTemplate,
+  CsvParserEngine,
   type AuditReportConfig,
   type ColumnSpec,
 } from './csvParserEngine';
@@ -26,11 +25,16 @@ const repairConfig: AuditReportConfig = {
   sampleData: [],
 };
 
+/** 剝除 BOM、以 LF 分割、過濾空行（用於 generateTemplate 斷言） */
+function parseLines(template: string): string[] {
+  return template.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+}
+
 // ---------------------------------------------------------------------------
-// parseRecordsCsv
+// CsvParserEngine.parse
 // ---------------------------------------------------------------------------
 
-describe('CsvParserEngine.parseRecordsCsv', () => {
+describe('CsvParserEngine.parse', () => {
   describe('正常 8 欄 CSV 解析', () => {
     it('解析標準 CSV 字串並映射至指定欄位結構', () => {
       const csv = [
@@ -38,12 +42,11 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '2024/01/15,09:30,王大明,203房浴室燈泡損壞,李主任,已更換燈泡,2024/01/16,14:00',
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value).toHaveLength(1);
-      // Use non-null assertion: length already asserted above
       expect(result.value[0]!).toMatchObject({
         date: '2024/01/15',
         time: '09:30',
@@ -63,7 +66,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '2024/02/10,11:00,陳美玲,走廊地磚鬆脫,張督導,已修補,2024/02/12,10:30',
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -78,7 +81,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '\uFEFF日期,時間,通報人員,通報事由,主管稽核,修繕處理狀況,完成日期,完成時間\n' +
         '2024/01/15,09:30,王大明,燈泡損壞,李主任,已更換,2024/01/16,14:00';
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -90,7 +93,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '日期,時間,通報人員,通報事由,主管稽核,修繕處理狀況,完成日期,完成時間\n' +
         '2024/01/15,09:30,王大明,燈泡損壞,,,,';
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -105,7 +108,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '2024/01/15,09:30,王大明,"203房, 呼叫鈴故障",李主任,已修繕,2024/01/16,14:00',
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -118,7 +121,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '2024/01/15,09:30,王大明,"說明含""引號""的事由",李主任,已修繕,2024/01/16,14:00',
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -130,11 +133,24 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '日期,時間,通報人員,通報事由,主管稽核,修繕處理狀況,完成日期,完成時間\n' +
         '2024/01/15,09:30,王大明,"第一行\n第二行",李主任,已修繕,2024/01/16,14:00';
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value[0]!.reason).toBe('第一行\n第二行');
+    });
+
+    it('引號包裹欄位保留前後空白（RFC 4180 不自動 trim 引號內容）', () => {
+      const csv = [
+        '日期,時間,通報人員,通報事由,主管稽核,修繕處理狀況,完成日期,完成時間',
+        '2024/01/15,09:30,王大明,"  有意義的前導空白  ",李主任,已修繕,2024/01/16,14:00',
+      ].join('\n');
+
+      const result = CsvParserEngine.parse(csv, repairConfig);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value[0]!.reason).toBe('  有意義的前導空白  ');
     });
   });
 
@@ -147,7 +163,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '',
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -159,7 +175,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '日期,時間,通報人員,通報事由,主管稽核,修繕處理狀況,完成日期,完成時間\r\n' +
         '2024/01/15,09:30,王大明,燈泡損壞,李主任,已更換,2024/01/16,14:00\r\n';
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -172,7 +188,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '2024/01/15,09:30,王大明,燈泡損壞,李主任,已更換,2024/01/16,14:00\n' +
         '2024/02/10,11:00,陳美玲,地磚鬆脫,張督導,已修補,2024/02/12,10:30\r\n';
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -188,7 +204,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '2024/01/15,09:30,燈泡損壞,李主任,已更換,2024/01/16,14:00',
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -196,14 +212,14 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
       expect(result.error.missingColumns).toContain('通報人員');
     });
 
-    it('僅缺少非必填欄位時仍成功解析', () => {
+    it('僅缺少非必填欄位時仍成功解析，缺失欄位填入空字串', () => {
       const csv = [
         '日期,時間,通報人員,通報事由',
         // 沒有 auditor, repairAction, completedDate, completedTime (all non-required)
         '2024/01/15,09:30,王大明,燈泡損壞',
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -218,7 +234,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
     it('僅有標頭列時回傳空陣列', () => {
       const csv = '日期,時間,通報人員,通報事由,主管稽核,修繕處理狀況,完成日期,完成時間';
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -231,7 +247,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
         '2024/01/15,09:30,王大明', // 只有 3 個值
       ].join('\n');
 
-      const result = parseRecordsCsv(csv, repairConfig);
+      const result = CsvParserEngine.parse(csv, repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -240,7 +256,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
     });
 
     it('完全空字串輸入時回傳空陣列', () => {
-      const result = parseRecordsCsv('', repairConfig);
+      const result = CsvParserEngine.parse('', repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -248,7 +264,7 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
     });
 
     it('僅含空白字元的輸入回傳空陣列', () => {
-      const result = parseRecordsCsv('   \n  \n  ', repairConfig);
+      const result = CsvParserEngine.parse('   \n  \n  ', repairConfig);
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -258,47 +274,60 @@ describe('CsvParserEngine.parseRecordsCsv', () => {
 });
 
 // ---------------------------------------------------------------------------
-// generateTemplate
+// CsvParserEngine.generateTemplate
 // ---------------------------------------------------------------------------
 
 describe('CsvParserEngine.generateTemplate', () => {
   it('依據欄位清單產出 CSV 範本文字，以標籤名稱作為標頭', () => {
-    const template = generateTemplate(repairConfig);
-    const lines = template.replace(/^\uFEFF/, '').split('\n');
-    const [headerLine] = lines;
+    const lines = parseLines(CsvParserEngine.generateTemplate(repairConfig));
 
-    expect(headerLine).toBe(
+    expect(lines[0]!).toBe(
       '日期,時間,通報人員,通報事由,主管稽核,修繕處理狀況,完成日期,完成時間',
     );
   });
 
   it('產出的範本以 UTF-8 BOM (\\uFEFF) 開頭（相容 Excel）', () => {
-    const template = generateTemplate(repairConfig);
+    const template = CsvParserEngine.generateTemplate(repairConfig);
 
     expect(template.startsWith('\uFEFF')).toBe(true);
   });
 
-  it('標頭之後包含一行示範資料列', () => {
+  it('行分隔符採 CRLF（RFC 4180 / Excel 跨平台相容）', () => {
     const configWithSample: AuditReportConfig = {
       ...repairConfig,
       sampleData: [
         {
-          date: '2024/01/15',
-          time: '09:30',
-          reporter: '王大明',
-          reason: '203房燈泡損壞',
-          auditor: '李主任',
-          repairAction: '已更換燈泡',
-          completedDate: '2024/01/16',
-          completedTime: '14:00',
+          date: '2024/01/15', time: '09:30', reporter: '王大明',
+          reason: '燈泡', auditor: '', repairAction: '',
+          completedDate: '', completedTime: '',
         },
       ],
     };
 
-    const template = generateTemplate(configWithSample);
-    const lines = template.replace(/^\uFEFF/, '').split('\n').filter(Boolean);
+    const raw = CsvParserEngine.generateTemplate(configWithSample).replace(/^\uFEFF/, '');
+
+    expect(raw).toContain('\r\n');
+    // joining 2 lines with CRLF → split gives exactly 2 segments (header + data)
+    expect(raw.split('\r\n')).toHaveLength(2);
+  });
+
+  it('標頭之後包含一行示範資料列，欄位值正確對應', () => {
+    const sampleRow = {
+      date: '2024/01/15', time: '09:30', reporter: '王大明',
+      reason: '203房燈泡損壞', auditor: '李主任',
+      repairAction: '已更換燈泡', completedDate: '2024/01/16', completedTime: '14:00',
+    };
+    const configWithSample: AuditReportConfig = {
+      ...repairConfig,
+      sampleData: [sampleRow],
+    };
+
+    const lines = parseLines(CsvParserEngine.generateTemplate(configWithSample));
 
     expect(lines).toHaveLength(2); // 標頭 + 1 筆示範資料
+    expect(lines[1]!).toBe(
+      '2024/01/15,09:30,王大明,203房燈泡損壞,李主任,已更換燈泡,2024/01/16,14:00',
+    );
   });
 
   it('欄位值含逗號時自動加雙引號包裹', () => {
@@ -306,27 +335,20 @@ describe('CsvParserEngine.generateTemplate', () => {
       ...repairConfig,
       sampleData: [
         {
-          date: '2024/01/15',
-          time: '09:30',
-          reporter: '王大明',
-          reason: '203房, 呼叫鈴故障',
-          auditor: '',
-          repairAction: '',
-          completedDate: '',
-          completedTime: '',
+          date: '2024/01/15', time: '09:30', reporter: '王大明',
+          reason: '203房, 呼叫鈴故障', auditor: '',
+          repairAction: '', completedDate: '', completedTime: '',
         },
       ],
     };
 
-    const template = generateTemplate(configWithComma);
-    const lines = template.replace(/^\uFEFF/, '').split('\n').filter(Boolean);
+    const lines = parseLines(CsvParserEngine.generateTemplate(configWithComma));
 
     expect(lines[1]!).toContain('"203房, 呼叫鈴故障"');
   });
 
   it('無 sampleData 時僅輸出標頭列', () => {
-    const template = generateTemplate(repairConfig); // repairConfig has sampleData: []
-    const lines = template.replace(/^\uFEFF/, '').split('\n').filter(Boolean);
+    const lines = parseLines(CsvParserEngine.generateTemplate(repairConfig));
 
     expect(lines).toHaveLength(1);
   });
