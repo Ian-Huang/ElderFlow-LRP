@@ -34,4 +34,8 @@ export interface AuditReportConfig {
   columns: AuditColumnDef[];
   /** 範本 CSV 附帶的示範資料列（可為空陣列） */
   sampleData: Record<string, string>[];
+  /** 機構全銜（可選，預設頁首機構名稱） */
+  orgName?: string;
+  /** 報表功能簡述（可選，供總覽卡片與導覽展示使用） */
+  description?: string;
 }

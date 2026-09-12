@@ -92,3 +92,27 @@
     box-sizing: border-box;
   }
 }
+
+/* -------------------------------------------------------------------------
+   評鑑制式報表表格樣式（粗黑實線：2.2px 外框、1.2px 內格線、垂直居中）
+   ----------------------------------------------------------------------- */
+.audit-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2.2px solid #000 !important;
+  font-size: 9.5pt;
+}
+
+.audit-report-table th,
+.audit-report-table td {
+  border: 1.2px solid #000 !important;
+  padding: 6px 4px;
+  vertical-align: middle !important;
+  line-height: 1.35;
+}
+
+.audit-report-table th {
+  background-color: #ffffff;
+  font-weight: 700;
+  text-align: center;
+}

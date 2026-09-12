@@ -15,6 +15,8 @@ export interface AuditReportShellProps {
   rows: Record<string, string>[];
   /** CSV 解析完成後的 callback（帶解析後的資料列） */
   onImport: (rows: Record<string, string>[]) => void;
+  /** 額外工具列操作元件（例如：模擬新增一筆資料按鈕） */
+  extraActions?: React.ReactNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -26,18 +28,20 @@ export interface AuditReportShellProps {
  *
  * 通用 A4 評鑑報表外殼元件，提供：
  * - 擬真 A4 紙張預覽（portrait / landscape 動態切換）
- * - 頂部工具列：下載 CSV 範本、匯入 CSV、立即列印
- * - contenteditable 標題點擊直接編輯（以 local state 管理，避免 re-render 覆蓋）
+ * - 頂部工具列：支援額外操作、下載 CSV 範本、匯入 CSV、立即列印
+ * - contenteditable 機構名稱與報表標題點擊直接編輯
  * - 檔案選取器整合 CsvParserEngine
  * - 動態資料筆數顯示
+ * - 評鑑專用粗黑實線表格與居中排版
  *
  * 列印時 @page 由此元件透過行內 <style> 注入，以支援直向/橫向並存。
  */
-export function AuditReportShell({ config, rows, onImport }: AuditReportShellProps) {
+export function AuditReportShell({ config, rows, onImport, extraActions }: AuditReportShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parseError, setParseError] = useState<string | null>(null);
-  // Local title state: prevents React re-render from overwriting user's contenteditable edits
+  // Local title and orgName state: prevents React re-render from overwriting user's contenteditable edits
   const [title, setTitle] = useState(config.title);
+  const [orgName, setOrgName] = useState(config.orgName ?? '');
 
   // -------------------------------------------------------------------------
   // A4 page style injected per instance (so portrait/landscape can coexist)
@@ -131,6 +135,9 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Extra custom actions (e.g. mock add row) */}
+          {extraActions}
+
           {/* Download template */}
           <button
             type="button"
@@ -178,27 +185,40 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
 
       {/* A4 Sheet Preview */}
       <div className={sheetClass} data-testid="a4-sheet">
-        {/* Report header — contenteditable title backed by local state */}
-        <div className="text-center mb-4">
+        {/* Report header — contenteditable title and orgName */}
+        <div className="report-header text-center mb-4">
+          {config.orgName && (
+            <div
+              data-testid="report-org-name"
+              contentEditable="true"
+              suppressContentEditableWarning
+              onBlur={(e) => setOrgName(e.currentTarget.textContent ?? config.orgName ?? '')}
+              className="text-2xl font-bold text-gray-900 tracking-wider mb-1 cursor-text"
+              title="點擊可直接修改機構名稱"
+            >
+              {orgName}
+            </div>
+          )}
           <h1
             data-testid="report-title"
             contentEditable="true"
             suppressContentEditableWarning
             onBlur={(e) => setTitle(e.currentTarget.textContent ?? config.title)}
-            className="text-xl font-bold text-gray-900 border-b-2 border-transparent hover:border-gray-300 focus:border-primary-400 focus:outline-none px-1 py-0.5 rounded transition-colors cursor-text"
+            className="text-xl font-bold text-gray-900 border-b-2 border-transparent hover:border-gray-300 focus:border-primary-400 focus:outline-none px-1 py-0.5 rounded transition-colors cursor-text inline-block"
+            title="點擊可直接修改報表標題"
           >
             {title}
           </h1>
         </div>
 
         {/* Table */}
-        <table className="w-full border-collapse text-sm" style={{ borderColor: '#000' }}>
+        <table className="audit-report-table w-full border-collapse text-sm" style={{ borderColor: '#000' }}>
           <thead>
             <tr>
               {config.columns.map((col) => (
                 <th
                   key={col.key}
-                  className="border border-black bg-gray-100 px-2 py-1.5 font-semibold text-center text-xs"
+                  className="border border-black bg-white px-2 py-1.5 font-bold text-center text-xs"
                   style={{
                     width: col.widthPercent ? `${col.widthPercent}%` : undefined,
                     textAlign: col.align ?? 'center',
@@ -228,7 +248,11 @@ export function AuditReportShell({ config, rows, onImport }: AuditReportShellPro
                     <td
                       key={col.key}
                       className="border border-black px-2 py-1 text-xs"
-                      style={{ textAlign: col.align ?? 'left' }}
+                      style={{
+                        textAlign: col.align ?? 'left',
+                        paddingLeft: col.align === 'left' ? '6px' : undefined,
+                        verticalAlign: 'middle',
+                      }}
                     >
                       {row[col.key] ?? ''}
                     </td>
