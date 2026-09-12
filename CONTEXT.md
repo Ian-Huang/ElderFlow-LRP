@@ -86,6 +86,15 @@
 - **關鍵模組**：ResidentRepository, MedicationRepository, CareRecordRepository, BaseOfflineRepository
 - **業務規則**：連線時採 Network-First 並自動背景快取；離線時無縫切換本機 Dexie 查詢；寫入時執行樂觀更新並排入 SyncQueue，連線時自動背景觸發同步 (對應 BR008)
 
+### 舊系統歷史資料庫 (Legacy Data Store)
+- **定義**：從既有舊版 LRP 系統 (chungshan.rdd.com.tw) 擷取並清洗完成的歷史資料快照（包含 26 位住民、約 19.2 萬筆歷史業務紀錄）
+- **關鍵路徑**：`downloaded-system/`（內含 `lrp_database.sqlite` 與 `normalized/*.json`）
+- **架構邊界與用途**：
+  1. 獨立存在，非新系統執行時代碼，新系統業務邏輯嚴禁直接耦合此目錄。
+  2. 供新系統開發時作為「真實機構業務欄位參考」、「E2E 測試真實假資料 (Test Fixtures / Seeds)」。
+  3. 未來若需將歷史資料匯入新系統，此處產出的正規化資料為標準遷移來源 (Migration Source)。
+  4. 詳細操作與重整流程見 `downloaded-system/README.md`。
+
 ## 實體關係
 
 ```

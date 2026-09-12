@@ -51,3 +51,12 @@ public/workbox-*.js
 
 # TypeScript
 *.tsbuildinfo
+
+# Legacy data asset (downloaded-system) - track scripts & docs, ignore big raw dumps
+downloaded-system/full_online_backup_complete.json
+downloaded-system/nursing_records_supplement.json
+downloaded-system/multidisciplinary_cases_supplement.json
+downloaded-system/extracted_data.json
+downloaded-system/lrp_database.sqlite
+downloaded-system/normalized/
+downloaded-system/chungshan.rdd.com.tw/
