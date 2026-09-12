@@ -95,6 +95,11 @@
   3. 未來若需將歷史資料匯入新系統，此處產出的正規化資料為標準遷移來源 (Migration Source)。
   4. 詳細操作與重整流程見 `downloaded-system/README.md`。
 
+### 評鑑報表工具箱 (Audit Toolkit)
+- **定義**：為應對長照評鑑時效性與解決舊系統難用引發的「影子 IT」問題所設立的實用主義過渡專區。提供純前端無伺服器依賴的 A4 評鑑報表產製引擎，支援標準 CSV 範本下載、歷史資料批次匯入、動態表頭編輯 (contenteditable) 與高保真 A4 直向/橫向列印，並具備平滑升級對接系統資料庫的能力。
+- **關鍵模組**：AuditToolkitPage, RepairReportPrintView, CsvParserEngine
+- **業務規則**：所有 CSV 解析必須在瀏覽器本機端完成不得洩漏個資；輸出之紙本與 PDF 必須嚴格符合衛福部評鑑追蹤格式與 A4 換頁不腰斬標準。
+
 ## 實體關係
 
 ```

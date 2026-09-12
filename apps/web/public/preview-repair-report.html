@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>機構修繕通報追蹤記錄 - 評鑑A4列印預覽 (支援CSV匯入)</title>
+  <style>
+    /* ==============================
+       1. 基礎重置與字型設定
+       ============================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      color: #000;
+      background-color: #d1d5db;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ==============================
+       2. 工具列 (螢幕顯示，列印時強制隱藏)
+       ============================== */
+    .screen-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15);
+    }
+
+    .toolbar-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 12px;
+      background: #334155;
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: #94a3b8;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn-primary {
+      background-color: #0284c7;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background-color: #0369a1;
+    }
+
+    .btn-secondary {
+      background-color: #475569;
+      color: #fff;
+    }
+    .btn-secondary:hover {
+      background-color: #334155;
+    }
+
+    .btn-success {
+      background-color: #059669;
+      color: #fff;
+    }
+    .btn-success:hover {
+      background-color: #047857;
+    }
+
+    .page-wrapper {
+      padding: 24px 0 40px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    /* ==============================
+       3. A4 紙張實體模擬容器
+       ============================== */
+    .a4-sheet {
+      background: #fff;
+      width: 210mm;
+      min-height: 297mm;
+      padding: 16mm 12mm;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    /* ==============================
+       4. 評鑑制式報表內容樣式
+       ============================== */
+    .report-header {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .org-name {
+      font-size: 20pt;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      margin-bottom: 6px;
+      color: #000;
+    }
+
+    .report-title {
+      font-size: 14.5pt;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      color: #111;
+    }
+
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 2.2px solid #000;
+      margin-top: 4px;
+      font-size: 9.5pt;
+    }
+
+    .report-table th,
+    .report-table td {
+      border: 1.2px solid #000;
+      padding: 6px 4px;
+      vertical-align: middle;
+      line-height: 1.35;
+    }
+
+    .report-table th {
+      background-color: #ffffff;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .col-center {
+      text-align: center;
+    }
+    .col-left {
+      text-align: left;
+      padding-left: 6px;
+    }
+
+    /* ==============================
+       5. 列印專用 CSS (@media print)
+       ============================== */
+    @page {
+      size: A4 portrait;
+      margin: 14mm 10mm 14mm 10mm;
+    }
+
+    @media print {
+      body {
+        background-color: transparent !important;
+        color: #000 !important;
+      }
+
+      .screen-toolbar {
+        display: none !important;
+      }
+
+      .page-wrapper {
+        padding: 0 !important;
+        gap: 0 !important;
+      }
+
+      .a4-sheet {
+        width: 100% !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+
+      /* 換頁時表格不腰斬 */
+      tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      /* 每頁頂部自動重現表頭 */
+      thead {
+        display: table-header-group;
+      }
+
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部控制面板 -->
+  <div class="screen-toolbar">
+    <div class="toolbar-title">
+      <span>📄 機構修繕通報追蹤記錄</span>
+      <span class="badge" id="row-counter">目前共 6 筆資料</span>
+    </div>
+    <div class="toolbar-actions">
+      <!-- 隱藏的檔案上傳 input -->
+      <input type="file" id="csv-file-input" accept=".csv" style="display: none;" onchange="handleFileSelect(event)" />
+      
+      <button class="btn btn-secondary" onclick="downloadTemplate()">📥 下載 CSV 範本</button>
+      <button class="btn btn-success" onclick="document.getElementById('csv-file-input').click()">📂 匯入 CSV 檔</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ 立即列印 / PDF</button>
+    </div>
+  </div>
+
+  <div class="page-wrapper">
+    <!-- A4 模擬紙張容器 -->
+    <div class="a4-sheet">
+      <!-- 機構全銜與表單標題 -->
+      <div class="report-header">
+        <div class="org-name" id="org-title-text" contenteditable="true" title="點擊可直接修改機構名稱">臺北市私立中山老人長期照顧中心(養護型)</div>
+        <div class="report-title" id="year-title-text" contenteditable="true" title="點擊可直接修改年度與標題">2026年度 機構修繕通報追蹤記錄</div>
+      </div>
+
+      <!-- 報表表格（8欄精確配置） -->
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th style="width: 11%;">日期</th>
+            <th style="width: 7%;">時間</th>
+            <th style="width: 10%;">通報人員</th>
+            <th style="width: 35%;">事由</th>
+            <th style="width: 9%;">稽核</th>
+            <th style="width: 12%;">修繕</th>
+            <th style="width: 9%;">日期(完)</th>
+            <th style="width: 7%;">時間(完)</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- 預設初始範例資料 -->
+          <tr>
+            <td class="col-center">2026/09/01</td>
+            <td class="col-center">11:00</td>
+            <td class="col-center">黃郁婷</td>
+            <td class="col-left">護理站鍵盤無法使用</td>
+            <td class="col-center">趙芬蘭</td>
+            <td class="col-center">購新</td>
+            <td class="col-center">2026/09/02</td>
+            <td class="col-center">08:00</td>
+          </tr>
+          <tr>
+            <td class="col-center">2026/09/03</td>
+            <td class="col-center">09:15</td>
+            <td class="col-center">陳美玲</td>
+            <td class="col-left">203房 2床 床頭緊急呼叫鈴按鈕接觸不良</td>
+            <td class="col-center">趙芬蘭</td>
+            <td class="col-center">更換微動開關</td>
+            <td class="col-center">2026/09/03</td>
+            <td class="col-center">11:30</td>
+          </tr>
+          <tr>
+            <td class="col-center">2026/09/05</td>
+            <td class="col-center">14:20</td>
+            <td class="col-center">張建志</td>
+            <td class="col-left">106房 王奶奶輪椅右側煞車夾片鬆動，推行易滑動</td>
+            <td class="col-center">趙芬蘭</td>
+            <td class="col-center">調整鎖緊並實測煞車</td>
+            <td class="col-center">2026/09/05</td>
+            <td class="col-center">15:00</td>
+          </tr>
+          <tr>
+            <td class="col-center">2026/09/07</td>
+            <td class="col-center">16:40</td>
+            <td class="col-center">李秀英</td>
+            <td class="col-left">2F多功能活動室冷氣室內機出風口凝結滴水</td>
+            <td class="col-center">趙芬蘭</td>
+            <td class="col-center">清通排水軟管管線</td>
+            <td class="col-center">2026/09/08</td>
+            <td class="col-center">10:20</td>
+          </tr>
+          <tr>
+            <td class="col-center">2026/09/10</td>
+            <td class="col-center">08:50</td>
+            <td class="col-center">黃郁婷</td>
+            <td class="col-left">公用無障礙洗手間L型安全扶手固定膨脹螺絲鬆動</td>
+            <td class="col-center">趙芬蘭</td>
+            <td class="col-center">重新補膠固定螺栓</td>
+            <td class="col-center">2026/09/10</td>
+            <td class="col-center">14:00</td>
+          </tr>
+          <tr>
+            <td class="col-center">2026/09/11</td>
+            <td class="col-center">19:30</td>
+            <td class="col-center">王宗翰</td>
+            <td class="col-left">1F 後側避難走道應急照明指示燈閃爍不亮</td>
+            <td class="col-center">趙芬蘭</td>
+            <td class="col-center">更換LED蓄電池燈組</td>
+            <td class="col-center">2026/09/12</td>
+            <td class="col-center">09:10</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // 更新筆數統計
+    function updateCounter() {
+      const count = document.getElementById('table-body').children.length;
+      document.getElementById('row-counter').innerText = `目前共 ${count} 筆資料`;
+    }
+
+    // 處理 CSV 檔案讀取
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        parseCSVAndRender(text);
+      };
+      // 讀取 UTF-8
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    // 解析 CSV 並動態插入表格
+    function parseCSVAndRender(csvText) {
+      const lines = csvText.trim().split(/\r\n|\n/);
+      if (lines.length <= 1) {
+        alert('CSV 內容為空或只有標題列！');
+        return;
+      }
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = ''; // 清空舊資料
+
+      // 第一行為表頭，從索引 1 開始讀
+      let addedCount = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // 簡單切分 CSV（支援處理包含逗號或引號的字串）
+        const cols = parseCSVLine(line);
+        if (cols.length < 4) continue; // 至少要有前四欄
+
+        const date = cols[0] || '';
+        const time = cols[1] || '';
+        const reporter = cols[2] || '';
+        const reason = cols[3] || '';
+        const auditor = cols[4] || '';
+        const action = cols[5] || '';
+        const doneDate = cols[6] || '';
+        const doneTime = cols[7] || '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="col-center">${escapeHtml(date)}</td>
+          <td class="col-center">${escapeHtml(time)}</td>
+          <td class="col-center">${escapeHtml(reporter)}</td>
+          <td class="col-left">${escapeHtml(reason)}</td>
+          <td class="col-center">${escapeHtml(auditor)}</td>
+          <td class="col-center">${escapeHtml(action)}</td>
+          <td class="col-center">${escapeHtml(doneDate)}</td>
+          <td class="col-center">${escapeHtml(doneTime)}</td>
+        `;
+        tbody.appendChild(tr);
+        addedCount++;
+      }
+
+      updateCounter();
+      alert(`成功匯入 ${addedCount} 筆修繕紀錄！您可以直接點擊列印或檢視。`);
+    }
+
+    // 輔助函式：切分 CSV 單行字元
+    function parseCSVLine(text) {
+      const re_value = /(?!\s*$)\s*(?:"([^"]*(?:""[^"]*)*)"|([^,\s]*))\s*(?:,|$)/g;
+      const a = [];
+      text.replace(re_value, function(m0, m1, m2) {
+        if (m1 !== undefined) a.push(m1.replace(/""/g, '"'));
+        else if (m2 !== undefined) a.push(m2);
+        return '';
+      });
+      return a;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // 產生並下載標準 CSV 範本
+    function downloadTemplate() {
+      const headers = ["日期", "時間", "通報人員", "事由", "稽核", "修繕", "日期(完)", "時間(完)"];
+      const sample1 = ["2026/09/01", "11:00", "黃郁婷", "護理站鍵盤無法使用", "趙芬蘭", "購新", "2026/09/02", "08:00"];
+      const sample2 = ["2026/09/03", "09:15", "陳美玲", "203房 2床 床頭緊急呼叫鈴按鈕接觸不良", "趙芬蘭", "更換微動開關", "2026/09/03", "11:30"];
+      
+      const csvContent = "\uFEFF" + [headers.join(','), sample1.join(','), sample2.join(',')].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', '機構修繕通報紀錄_匯入範本.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
