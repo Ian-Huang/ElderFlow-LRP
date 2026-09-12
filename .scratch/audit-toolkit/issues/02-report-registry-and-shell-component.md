@@ -5,12 +5,19 @@
 
 **Blocked by:** 01: 評鑑報表核心引擎與 CSV 解析器 (Core Print Engine & CsvParserEngine)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 定義 `AuditReportConfig`、`AuditColumnDef` 與 `ReportOrientation` 領域型別契約。
-- [ ] 實作 `AuditReportShell` 元件，於螢幕上呈現擬真 A4 紙張與邊界陰影效果。
-- [ ] 支援依據 `orientation` 動態切換直向（A4 Portrait）或橫向（A4 Landscape）排版。
-- [ ] 頂部工具列具備「下載 CSV 範本」、「匯入 CSV 檔」與「立即列印 / PDF」控制按鈕，並於列印時自動隱藏（`.no-print`）。
-- [ ] 標題與年度文字區域支援點擊直接編輯 (`contenteditable="true"`)，改動即時反映於預覽與列印。
-- [ ] 整合檔案選取器 (`<input type="file">`)，檔案讀取完畢後自動呼叫 `CsvParserEngine` 觸發資料更新。
-- [ ] 撰寫元件測試，驗證外殼在直向/橫向下的渲染狀態與按鈕事件觸發。
+- [x] 定義 `AuditReportConfig`、`AuditColumnDef` 與 `ReportOrientation` 領域型別契約。
+- [x] 實作 `AuditReportShell` 元件，於螢幕上呈現擬真 A4 紙張與邊界陰影效果。
+- [x] 支援依據 `orientation` 動態切換直向（A4 Portrait）或橫向（A4 Landscape）排版。
+- [x] 頂部工具列具備「下載 CSV 範本」、「匯入 CSV 檔」與「立即列印 / PDF」控制按鈕，並於列印時自動隱藏（`.no-print`）。
+- [x] 標題與年度文字區域支援點擊直接編輯 (`contenteditable="true"`)，改動即時反映於預覽與列印。
+- [x] 整合檔案選取器 (`<input type="file">`)，檔案讀取完畢後自動呼叫 `CsvParserEngine` 觸發資料更新。
+- [x] 撰寫元件測試，驗證外殼在直向/橫向下的渲染狀態與按鈕事件觸發。
+
+## Deliverables
+
+- `apps/web/src/pages/audit-toolkit/auditToolkitTypes.ts` — `AuditReportConfig`, `AuditColumnDef`, `ReportOrientation`
+- `apps/web/src/pages/audit-toolkit/AuditReportShell.tsx` — 通用 A4 外殼元件
+- `apps/web/src/pages/audit-toolkit/AuditReportShell.test.tsx` — 15 項元件測試，全數通過
+- `apps/web/src/pages/audit-toolkit/index.ts` — 公開 API barrel
