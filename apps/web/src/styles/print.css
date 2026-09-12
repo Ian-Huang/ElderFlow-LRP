@@ -1,0 +1,105 @@
+/**
+ * 共用 A4 列印樣式規範 (Shared A4 Print Styles)
+ *
+ * 本檔案封裝評鑑報表工具箱所需的全域列印規則：
+ * - A4 紙張尺寸與邊距設定
+ * - 隱藏非列印元素（工具列、按鈕等）
+ * - 防止表格行跨頁截斷
+ * - 表頭（thead）跨頁自動重現
+ * - 移除印前元素（背景、陰影、邊框）
+ *
+ * 使用方式：在需要 A4 列印能力的頁面元件中 import 此檔案，
+ * 並在對應元素上加上 `.a4-sheet`、`.no-print` class。
+ */
+
+/* -------------------------------------------------------------------------
+   A4 頁面設定
+   ----------------------------------------------------------------------- */
+@page {
+  size: A4 portrait;
+  margin: 14mm 10mm 14mm 10mm;
+}
+
+/* -------------------------------------------------------------------------
+   列印媒體規則
+   ----------------------------------------------------------------------- */
+@media print {
+  /* 還原背景為透明，避免列印器輸出灰底 */
+  body {
+    background: transparent !important;
+  }
+
+  /* 隱藏工具列、按鈕、導覽列等非列印元素 */
+  .no-print {
+    display: none !important;
+  }
+
+  /* A4 紙張容器：重置 margin/padding/shadow/border，充滿可列印區域 */
+  .a4-sheet {
+    width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  /* 防止表格行跨頁截斷（確保行整行位於同一頁） */
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* 表頭跨頁自動重現 */
+  thead {
+    display: table-header-group;
+  }
+
+  /* 防止 thead 的行被截斷 */
+  thead tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* 防止 tbody 的行被截斷 */
+  tbody tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* 表格本身不分頁截斷 */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  /* 超連結不展開顯示 URL */
+  a[href]::after {
+    content: none !important;
+  }
+
+  /* 確保文字顏色為黑色（廉價黑白印表機相容） */
+  .a4-sheet * {
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   螢幕預覽：模擬 A4 紙張外觀
+   ----------------------------------------------------------------------- */
+@media screen {
+  .a4-sheet {
+    /* A4 @ 96 DPI: 210mm ≈ 794px, 297mm ≈ 1123px */
+    width: 794px;
+    min-height: 1123px;
+    margin: 24px auto;
+    padding: 14mm 10mm;
+    background: #fff;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.18);
+    border: 1px solid #e5e7eb;
+    box-sizing: border-box;
+  }
+}

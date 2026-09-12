@@ -5,12 +5,18 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `CsvParserEngine.parse()` 能正確解析標準 CSV 字串並映射至指定欄位結構。
-- [ ] 支援處理包含雙引號與逗號的文字欄位（如 `"203房, 呼叫鈴故障"`）。
-- [ ] 自動過濾空行、容錯相容 CRLF 與 LF 換行格式。
-- [ ] 能自動剝除 UTF-8 BOM 標頭（`\uFEFF`），避免表頭文字比對失敗。
-- [ ] `CsvParserEngine.generateTemplate()` 能依據傳入的欄位清單產出合規之 CSV 範本文字。
-- [ ] 撰寫純單元測試，達成 100% 邏輯與邊界案例覆蓋（涵蓋畸形資料、缺少欄位防呆）。
-- [ ] 封裝共用 A4 列印樣式規則（`@page`、`@media print`、`break-inside: avoid`、`thead` 重複）。
+- [x] `CsvParserEngine.parse()` 能正確解析標準 CSV 字串並映射至指定欄位結構。
+- [x] 支援處理包含雙引號與逗號的文字欄位（如 `"203房, 呼叫鈴故障"`）。
+- [x] 自動過濾空行、容錯相容 CRLF 與 LF 換行格式。
+- [x] 能自動剝除 UTF-8 BOM 標頭（`\uFEFF`），避免表頭文字比對失敗。
+- [x] `CsvParserEngine.generateTemplate()` 能依據傳入的欄位清單產出合規之 CSV 範本文字。
+- [x] 撰寫純單元測試，達成 100% 邏輯與邊界案例覆蓋（涵蓋畸形資料、缺少欄位防呆）。
+- [x] 封裝共用 A4 列印樣式規則（`@page`、`@media print`、`break-inside: avoid`、`thead` 重複）。
+
+## Deliverables
+
+- `apps/web/src/utils/csvParserEngine.ts` — 純 TS 深模組，無 DOM 依賴
+- `apps/web/src/utils/csvParserEngine.test.ts` — 21 項單元測試，全數通過
+- `apps/web/src/styles/print.css` — 共用 A4 列印樣式
