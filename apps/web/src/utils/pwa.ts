@@ -53,15 +53,148 @@ function setupBackgroundSyncBridge() {
   });
 }
 
+type UpdateCallback = (reload: () => Promise<void>) => void;
+type OfflineReadyCallback = () => void;
+
+const updateListeners = new Set<UpdateCallback>();
+const offlineReadyListeners = new Set<OfflineReadyCallback>();
+const activeFormDirtCheckers = new Map<string, () => boolean>();
+let pendingReloadFn: (() => Promise<void>) | null = null;
+
+/**
+ * Register a listener when a Service Worker update is detected
+ */
+export function onPwaUpdateAvailable(callback: UpdateCallback): () => void {
+  updateListeners.add(callback);
+  if (pendingReloadFn) {
+    callback(pendingReloadFn);
+  }
+  return () => {
+    updateListeners.delete(callback);
+  };
+}
+
+/**
+ * Trigger the non-blocking update notification to all subscribers
+ */
+export function triggerPwaUpdate(reloadFn: () => Promise<void>): void {
+  pendingReloadFn = reloadFn;
+  updateListeners.forEach((cb) => {
+    try {
+      cb(reloadFn);
+    } catch (e) {
+      console.error('Error executing PWA update listener:', e);
+    }
+  });
+}
+
+/**
+ * Register a listener when PWA is ready for offline use
+ */
+export function onPwaOfflineReady(callback: OfflineReadyCallback): () => void {
+  offlineReadyListeners.add(callback);
+  return () => {
+    offlineReadyListeners.delete(callback);
+  };
+}
+
+/**
+ * Notify that PWA is ready for offline work
+ */
+export function triggerPwaOfflineReady(): void {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem('pwa-offline-ready', 'true');
+    } catch {
+      // ignore
+    }
+  }
+  offlineReadyListeners.forEach((cb) => {
+    try {
+      cb();
+    } catch (e) {
+      console.error('Error executing PWA offline ready listener:', e);
+    }
+  });
+}
+
+/**
+ * Register an active form dirty state checker
+ */
+export function registerFormEditing(id: string, isDirty: () => boolean): () => void {
+  activeFormDirtCheckers.set(id, isDirty);
+  return () => {
+    activeFormDirtCheckers.delete(id);
+  };
+}
+
+/**
+ * Check if the user is currently editing a form to prevent disruptive reloads
+ */
+export function isFormEditingActive(): boolean {
+  // 1. Check registered form dirty checkers
+  for (const check of activeFormDirtCheckers.values()) {
+    try {
+      if (check()) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Check DOM for active dirty forms or active input
+  if (typeof document !== 'undefined') {
+    const dirtyForm = document.querySelector('form[data-dirty="true"], form.is-dirty');
+    if (dirtyForm) return true;
+
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+      const input = activeEl as HTMLInputElement | HTMLTextAreaElement;
+      if (input.type !== 'submit' && input.type !== 'button' && input.value.trim().length > 0) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check for Service Worker updates manually
+ */
+export async function checkForSwUpdate(): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return false;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (registration) {
+      await registration.update();
+      return true;
+    }
+  } catch (error) {
+    console.warn('Failed to check for Service Worker update:', error);
+  }
+  return false;
+}
+
 export function registerPWA(options: RegisterSWOptions = {}) {
   const updateSW = registerSW({
     onNeedRefresh() {
-      if (confirm('有新版本可用，是否立即更新？')) {
-        void updateSW(true);
+      const reloadAction = async () => {
+        await updateSW(true);
+      };
+      triggerPwaUpdate(reloadAction);
+      if (options.onNeedRefresh) {
+        options.onNeedRefresh();
       }
     },
     onOfflineReady() {
       console.log('App ready to work offline');
+      triggerPwaOfflineReady();
+      if (options.onOfflineReady) {
+        options.onOfflineReady();
+      }
     },
     onRegistered(registration: ServiceWorkerRegistration | undefined) {
       console.log('SW Registered');
@@ -70,9 +203,16 @@ export function registerPWA(options: RegisterSWOptions = {}) {
       if ('SyncManager' in window && registration && hasBackgroundSync(registration)) {
         void registration.sync.register('lrp-sync-now').catch(() => undefined);
       }
+
+      if (options.onRegistered) {
+        options.onRegistered(registration);
+      }
     },
-    onRegisterError(_error: unknown) {
-      console.log('SW registration error');
+    onRegisterError(error: unknown) {
+      console.log('SW registration error', error);
+      if (options.onRegisterError) {
+        options.onRegisterError(error);
+      }
     },
     ...options,
   });

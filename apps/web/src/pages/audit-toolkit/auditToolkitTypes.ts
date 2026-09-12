@@ -38,4 +38,6 @@ export interface AuditReportConfig {
   orgName?: string;
   /** 報表功能簡述（可選，供總覽卡片與導覽展示使用） */
   description?: string;
+  /** 報表發布狀態（可選，預設為 'available'） */
+  status?: 'available' | 'coming-soon';
 }

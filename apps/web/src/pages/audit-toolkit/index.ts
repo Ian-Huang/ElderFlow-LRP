@@ -11,6 +11,35 @@ export {
   mockRepairPool,
   getNextMockRepair,
 } from './repairReportConfig';
-export { reportRegistry } from './reportRegistry';
+export {
+  sanitationReportConfig,
+  sanitationReportColumns,
+  generateMonthSanitationData,
+  defaultSanitationSampleData,
+  DAILY_TWICE_KEYS,
+  DAILY_FOUR_TIMES_KEYS,
+  isFutureDate,
+  getHandwrittenSeed,
+} from './sanitationReportConfig';
+export {
+  reportRegistry,
+  visitorReportConfig,
+  visitorReportColumns,
+} from './reportRegistry';
 export { RepairReportPrintView, RepairReportPage } from './RepairReportPrintView';
+export { SanitationReportPrintView, SanitationReportPage, HandwrittenCheck } from './SanitationReportPrintView';
 export type { RepairRecord } from './repairReportConfig';
+
+// Toolkit Hub & Dispatcher
+export { AuditToolkitHub } from './AuditToolkitHub';
+export { AuditReportDispatcher } from './AuditReportDispatcher';
+
+// Icons
+export {
+  DownloadIcon,
+  UploadIcon,
+  PrintIcon,
+  PlusIcon,
+  ArrowLeftIcon,
+  BriefcaseIcon,
+} from './icons';

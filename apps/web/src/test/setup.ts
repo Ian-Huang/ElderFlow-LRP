@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { vi, beforeAll, afterAll } from 'vitest';
+import { vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 
 // Mock matchMedia
@@ -18,11 +18,39 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+class ResizeObserverMock {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+
+global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+if (typeof window !== 'undefined') {
+  window.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+}
+
+// In beforeEach, also re-ensure ResizeObserver is attached in case any test overwrites it
+beforeEach(() => {
+  global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+  if (typeof window !== 'undefined') {
+    window.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+  }
+});
+
+// Polyfill Blob.prototype.stream for jsdom environment compatibility with Undici & MSW
+if (typeof window !== 'undefined' && typeof window.Blob !== 'undefined') {
+  if (typeof window.Blob.prototype.stream !== 'function') {
+    window.Blob.prototype.stream = function () {
+      return new ReadableStream({
+        start: async (controller) => {
+          const buf = await this.arrayBuffer();
+          controller.enqueue(new Uint8Array(buf));
+          controller.close();
+        },
+      });
+    };
+  }
+}
 
 // Mock localStorage
 const localStorageMock = {

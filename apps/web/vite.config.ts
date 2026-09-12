@@ -8,14 +8,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'sw-sync.js'],
+      includeAssets: ['favicon.ico', 'favicon.svg', 'robots.txt', 'sw-sync.js', 'manifest.webmanifest'],
       manifest: {
         name: 'LRP 長照管理系統',
         short_name: 'LRP',
         description: '台灣長期照護機構管理系統 - 離線優先 PWA',
         theme_color: '#2563eb',
         background_color: '#ffffff',
-        display: 'fullscreen',
+        display: 'standalone',
         orientation: 'landscape',
         scope: '/',
         start_url: '/login',
@@ -38,6 +38,7 @@ export default defineConfig({
         dir: 'ltr'
       },
       workbox: {
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
@@ -115,6 +116,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           query: ['@tanstack/react-query'],
           state: ['zustand'],
+          charts: ['recharts'],
           shared: ['@lrp/shared']
         }
       }

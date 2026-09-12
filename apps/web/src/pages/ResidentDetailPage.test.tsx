@@ -129,4 +129,64 @@ describe('ResidentDetailPage', () => {
     expect(await screen.findByText('確認停用 / 住民離院')).toBeInTheDocument();
     expect(screen.getByLabelText(/離院 \/ 停用原因/i)).toBeInTheDocument();
   });
+
+  it('renders embedded active care plan summary card and progress bar in care plan tab', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(apiClient, 'get').mockImplementation(async (url) => {
+      if (url.includes('/residents/0040')) {
+        return { success: true, data: mockDetail };
+      }
+      if (url.includes('/care-plans')) {
+        return {
+          success: true,
+          data: {
+            items: [
+              {
+                planId: 'CP-001',
+                residentId: '0040',
+                status: 'Active',
+                assessmentDate: '2024-01-10',
+                reviewDate: '2024-07-10',
+                goals: [
+                  {
+                    goalId: 'G-001',
+                    description: '控制血壓平穩',
+                    targetDate: '2024-06-30',
+                    progress: 75,
+                    status: 'InProgress',
+                  },
+                ],
+                serviceItems: [
+                  {
+                    itemId: 'SI-001',
+                    name: '生命徵象監測',
+                    frequency: '每日兩次',
+                    responsibleRole: 'Nurse',
+                  },
+                ],
+              },
+            ],
+            total: 1,
+          },
+        };
+      }
+      return { success: true, data: { items: [], total: 0 } };
+    });
+
+    renderDetail('0040');
+
+    await screen.findByRole('heading', { name: '周吳綺緣' });
+
+    const planTab = screen.getByRole('tab', { name: /照護計畫/i });
+    await user.click(planTab);
+
+    expect(await screen.findByText('當前啟用中計畫')).toBeInTheDocument();
+    expect(screen.getByText('CP-001')).toBeInTheDocument();
+    expect(screen.getByText('控制血壓平穩')).toBeInTheDocument();
+    expect(screen.getByText('75%')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /查看完整計畫 →/i })).toHaveAttribute(
+      'href',
+      '/care-plans/CP-001'
+    );
+  });
 });

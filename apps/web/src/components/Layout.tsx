@@ -1,9 +1,11 @@
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useUIStore } from '@/stores/uiStore';
 import { UserSwitcher } from '@/components/UserSwitcher';
 import { SyncStatusIndicator } from '@/components/SyncStatusIndicator';
+import { PwaInstallPrompt, OfflineReadyBadge, PwaUpdateToast } from '@/components/pwa';
 import type { UserRole } from '@lrp/shared';
 
 export function Layout() {
@@ -11,29 +13,117 @@ export function Layout() {
   const { user, clearAuth, hasRole } = useAuthStore();
   const { isOnline, isSyncing, pendingChanges, conflicts } = useSyncStore();
   const { sidebarOpen, toggleSidebar, resolvedTheme, kioskMode } = useUIStore();
+  const [unlockClicks, setUnlockClicks] = useState<number>(0);
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Check URL param ?kiosk=1 on mount and handle beforeunload when in kiosk mode
+  useEffect(() => {
+    useUIStore.getState().initKioskFromUrl();
+  }, []);
+
+  useEffect(() => {
+    if (!kioskMode) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '系統正處於 Kiosk 鎖定模式，確定要離開嗎？';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [kioskMode]);
+
+  const handleEmergencyUnlock = () => {
+    const nextClicks = unlockClicks + 1;
+    setUnlockClicks(nextClicks);
+
+    if (unlockTimerRef.current) {
+      clearTimeout(unlockTimerRef.current);
+    }
+
+    unlockTimerRef.current = setTimeout(() => {
+      setUnlockClicks(0);
+    }, 3000);
+
+    if (nextClicks >= 5) {
+      setUnlockClicks(0);
+      useUIStore.getState().setKioskMode(false);
+    }
+  };
 
   const handleLogout = () => {
     clearAuth();
     navigate('/login');
   };
 
-  const navigation: { path: string; label: string; icon: React.FC<{ className?: string }>; roles: UserRole[] }[] = [
+  const navigation: {
+    path: string;
+    label: string;
+    icon: React.FC<{ className?: string }>;
+    roles: UserRole[];
+    isPublic?: boolean;
+  }[] = [
     { path: '/dashboard', label: '儀表板', icon: HomeIcon, roles: ['caregiver', 'supervisor', 'admin', 'sysadmin'] },
     { path: '/residents', label: '住民管理', icon: UsersIcon, roles: ['caregiver', 'supervisor', 'admin', 'sysadmin'] },
     { path: '/care-records', label: '照護記錄', icon: ClipboardIcon, roles: ['caregiver', 'supervisor', 'admin', 'sysadmin'] },
     { path: '/medications', label: '藥物管理', icon: PillIcon, roles: ['caregiver', 'supervisor', 'admin', 'sysadmin'] },
     { path: '/care-plans', label: '照護計畫', icon: DocumentIcon, roles: ['supervisor', 'admin', 'sysadmin'] },
     { path: '/reports', label: '報表中心', icon: ChartIcon, roles: ['supervisor', 'admin', 'sysadmin'] },
+    { path: '/audit-toolkit', label: '評鑑工具箱', icon: BriefcaseIcon, roles: ['caregiver', 'supervisor', 'admin', 'sysadmin'], isPublic: true },
     { path: '/settings', label: '系統設定', icon: SettingsIcon, roles: ['admin', 'sysadmin'] },
   ];
 
-  const filteredNav = navigation.filter((item) => hasRole(item.roles));
+  const filteredNav = navigation.filter((item) => item.isPublic || hasRole(item.roles));
   const pendingConflicts = conflicts.filter((c) => c.status === 'Pending').length;
 
   if (kioskMode) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Outlet />
+      <div className="min-h-screen bg-gray-50 flex flex-col" data-testid="kiosk-layout">
+        {/* Minimal Locked Kiosk Header */}
+        <header className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center justify-between select-none shadow-sm sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleEmergencyUnlock}
+              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 active:scale-95 transition-all text-left"
+              aria-label="Kiosk 模式圖示 (點擊5次解除鎖定)"
+              title="緊急解除：連續點擊 5 次"
+              data-testid="kiosk-logo-btn"
+            >
+              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-sm">LRP</span>
+              </div>
+              <div className="hidden sm:block">
+                <span className="font-semibold text-gray-900 text-sm block">Kiosk 照護模式</span>
+                <span className="text-xs text-gray-500">鎖定導航中</span>
+              </div>
+            </button>
+
+            <span className="text-xs px-2 py-0.5 bg-primary-50 text-primary-700 font-medium rounded border border-primary-200 hidden md:inline-block">
+              螢幕常亮保持中
+            </span>
+
+            {unlockClicks > 0 && unlockClicks < 5 && (
+              <span className="text-xs text-amber-600 font-semibold animate-pulse" data-testid="unlock-click-hint">
+                再點擊 {5 - unlockClicks} 次解除鎖定
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <OfflineReadyBadge />
+            <SyncStatusIndicator />
+            <UserSwitcher />
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+          <Outlet />
+        </main>
+        <PwaUpdateToast />
       </div>
     );
   }
@@ -42,7 +132,7 @@ export function Layout() {
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${
+        className={`no-print fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0 lg:static lg:z-auto`}
         aria-label="主導覽選單"
@@ -124,21 +214,31 @@ export function Layout() {
               <div className="flex items-center gap-3 px-2 py-2">
                 <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-primary-700 font-medium text-sm">
-                    {user?.name?.charAt(0) || 'U'}
+                    {user?.name?.charAt(0) || 'G'}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-                  <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{user?.name || '訪客模式'}</p>
+                  <p className="text-xs text-gray-500 capitalize">{user?.role || '免登入'}</p>
                 </div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                <LogoutIcon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
-                <span>登出</span>
-              </button>
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <LogoutIcon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+                  <span>登出</span>
+                </button>
+              ) : (
+                <NavLink
+                  to="/login"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors font-medium"
+                >
+                  <LogoutIcon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+                  <span>前往登入</span>
+                </NavLink>
+              )}
             </div>
           </div>
         </div>
@@ -147,7 +247,7 @@ export function Layout() {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          className="no-print fixed inset-0 z-30 bg-black/50 lg:hidden"
           onClick={toggleSidebar}
           aria-hidden="true"
         />
@@ -156,7 +256,7 @@ export function Layout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-0">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white border-b border-gray-200">
+        <header className="no-print sticky top-0 z-20 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-4">
               <button
@@ -173,7 +273,16 @@ export function Layout() {
               </h1>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* PWA Install Button */}
+              <PwaInstallPrompt />
+
+              {/* Offline Readiness Badge */}
+              <OfflineReadyBadge />
+
+              {/* Sync status */}
+              <SyncStatusIndicator />
+
               {/* User Switcher */}
               <UserSwitcher />
 
@@ -203,17 +312,15 @@ export function Layout() {
                   <MonitorIcon className="w-5 h-5" aria-hidden="true" />
                 </button>
               )}
-
-              {/* Sync status */}
-              <SyncStatusIndicator />
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto print:p-0 print:overflow-visible">
           <Outlet />
         </main>
+        <PwaUpdateToast />
       </div>
     </div>
   );
@@ -305,6 +412,19 @@ function MonitorIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function BriefcaseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+      />
     </svg>
   );
 }

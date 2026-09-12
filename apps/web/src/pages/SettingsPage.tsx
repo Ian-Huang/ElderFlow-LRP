@@ -22,6 +22,31 @@ export function SettingsPage() {
         <p className="text-gray-500 mt-1">管理系統偏好、使用者帳號與同步設定</p>
       </div>
 
+      {/* Admin Portal Banner for Admin/Sysadmin */}
+      {canManageSystem && (
+        <section className="card bg-gradient-to-r from-primary-900 to-primary-700 text-white shadow-md border-0">
+          <div className="card-body p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded text-xs font-semibold bg-white/20 text-white">
+                  管理者專屬
+                </span>
+                <h2 className="text-lg font-bold text-white">系統管理中心 (Admin Portal)</h2>
+              </div>
+              <p className="text-sm text-primary-100">
+                前往專屬系統管理中心進行使用者名冊 CRUD、最後管理員保護、系統健康監控、功能旗標發布與核心參數設定。
+              </p>
+            </div>
+            <Link
+              to="/admin"
+              className="px-5 py-2.5 bg-white text-primary-700 hover:bg-primary-50 rounded-lg text-sm font-bold shadow transition-all whitespace-nowrap self-stretch sm:self-auto text-center"
+            >
+              進入系統管理中心 (/admin) &rarr;
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* Appearance */}
       <section className="card">
         <div className="card-header">

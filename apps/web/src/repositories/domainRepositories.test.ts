@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { residentRepository } from './residentRepository';
 import { medicationRepository } from './medicationRepository';
 import { careRecordRepository } from './careRecordRepository';
+import { carePlanRepository } from './carePlanRepository';
 import { offlineDb } from '@/utils/offlineDb';
 
 describe('Domain Repositories', () => {
@@ -10,6 +11,7 @@ describe('Domain Repositories', () => {
     await offlineDb.Residents.clear();
     await offlineDb.Medications.clear();
     await offlineDb.CareRecords.clear();
+    await offlineDb.CarePlans.clear();
     await offlineDb.SyncQueue.clear();
   });
 
@@ -249,6 +251,100 @@ describe('Domain Repositories', () => {
       const oldLock = careRecordRepository.getLockStatus({ submittedAt: old } as any);
       expect(oldLock.locked).toBe(true);
       expect(oldLock.text).toBe('已鎖定');
+    });
+  });
+
+  describe('carePlanRepository', () => {
+    it('should list care plans and filter by residentId and status offline', async () => {
+      await offlineDb.CarePlans.bulkPut([
+        {
+          planId: 'CP-001',
+          localId: 'CP-001',
+          residentId: 'R01',
+          status: 'Active',
+          assessmentDate: '2024-01-10',
+          reviewDate: '2024-07-10',
+          createdBy: 'sup-1',
+          goals: [
+            {
+              goalId: 'G-1',
+              description: '目標1',
+              targetDate: '2024-06-30',
+              progress: 50,
+              status: 'InProgress',
+            },
+          ],
+          serviceItems: [],
+          syncStatus: 'synced',
+          version: 1,
+          createdAt: '2024-01-10T00:00:00Z',
+          updatedAt: '2024-01-10T00:00:00Z',
+        },
+        {
+          planId: 'CP-002',
+          localId: 'CP-002',
+          residentId: 'R02',
+          status: 'Draft',
+          assessmentDate: '2024-02-01',
+          reviewDate: '2024-08-01',
+          createdBy: 'sup-1',
+          goals: [],
+          serviceItems: [],
+          syncStatus: 'synced',
+          version: 1,
+          createdAt: '2024-02-01T00:00:00Z',
+          updatedAt: '2024-02-01T00:00:00Z',
+        },
+      ]);
+
+      const res = await carePlanRepository.list({
+        isOnline: false,
+        residentId: 'R01',
+        status: 'Active',
+      });
+
+      expect(res.items).toHaveLength(1);
+      expect(res.items[0]?.planId).toBe('CP-001');
+      expect(res.items[0]?.goals[0]?.progress).toBe(50);
+    });
+
+    it('should transition status offline, update local DB and enqueue sync', async () => {
+      await offlineDb.CarePlans.put({
+        planId: 'CP-001',
+        localId: 'CP-001',
+        residentId: 'R01',
+        status: 'Draft',
+        assessmentDate: '2024-01-10',
+        reviewDate: '2024-07-10',
+        createdBy: 'sup-1',
+        goals: [],
+        serviceItems: [],
+        syncStatus: 'synced',
+        version: 1,
+        createdAt: '2024-01-10T00:00:00Z',
+        updatedAt: '2024-01-10T00:00:00Z',
+      });
+
+      const updated = await carePlanRepository.transitionStatus(
+        'CP-001',
+        'Active',
+        '審核通過啟用',
+        { isOnline: false }
+      );
+
+      expect(updated.status).toBe('Active');
+
+      const inDb = await offlineDb.CarePlans.get('CP-001');
+      expect(inDb?.status).toBe('Active');
+      expect(inDb?.syncStatus).toBe('pending');
+
+      const syncQueue = await offlineDb.SyncQueue.toArray();
+      expect(syncQueue).toHaveLength(1);
+      expect(syncQueue[0]?.entityType).toBe('CarePlans');
+      expect(syncQueue[0]?.payload).toEqual({
+        status: 'Active',
+        reason: '審核通過啟用',
+      });
     });
   });
 });

@@ -1,8 +1,32 @@
 import { useState, useCallback } from 'react';
+import { useNavigate, useInRouterContext } from 'react-router-dom';
 import { AuditReportShell } from './AuditReportShell';
 import { reportRegistry } from './reportRegistry';
 import { repairReportConfig, getNextMockRepair } from './repairReportConfig';
 import { PlusIcon } from './icons';
+
+function InnerRepairShell(props: {
+  config: typeof repairReportConfig;
+  rows: Record<string, string>[];
+  onImport: (rows: Record<string, string>[]) => void;
+  extraActions: React.ReactNode;
+}) {
+  const inRouter = useInRouterContext();
+  if (inRouter) {
+    return <InnerRepairShellWithRouter {...props} />;
+  }
+  return <AuditReportShell {...props} />;
+}
+
+function InnerRepairShellWithRouter(props: {
+  config: typeof repairReportConfig;
+  rows: Record<string, string>[];
+  onImport: (rows: Record<string, string>[]) => void;
+  extraActions: React.ReactNode;
+}) {
+  const navigate = useNavigate();
+  return <AuditReportShell {...props} onBack={() => navigate('/audit-toolkit')} />;
+}
 
 /**
  * 機構修繕通報追蹤記錄 評鑑列印檢視模組 (RepairReportPrintView)
@@ -47,7 +71,7 @@ export function RepairReportPrintView() {
 
   return (
     <div className="repair-report-print-view" data-testid="repair-report-print-view">
-      <AuditReportShell
+      <InnerRepairShell
         config={config}
         rows={rows}
         onImport={handleImport}

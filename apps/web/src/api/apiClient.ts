@@ -4,7 +4,80 @@ import type { ApiResponse, ApiError } from '@lrp/shared';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
-class ApiClient {
+let sessionCsrfToken: string | null = null;
+
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+  return match && match[3] !== undefined ? decodeURIComponent(match[3]) : null;
+}
+
+export function getCsrfToken(): string {
+  const cookieToken = getCookie('csrf_token') || getCookie('XSRF-TOKEN');
+  if (cookieToken) {
+    sessionCsrfToken = cookieToken;
+    return cookieToken;
+  }
+  if (!sessionCsrfToken) {
+    try {
+      sessionCsrfToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('csrf_token') : null;
+    } catch {
+      // ignore
+    }
+  }
+  if (!sessionCsrfToken) {
+    sessionCsrfToken =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'csrf-' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('csrf_token', sessionCsrfToken);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return sessionCsrfToken;
+}
+
+export function setCsrfToken(token: string): void {
+  sessionCsrfToken = token;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('csrf_token', token);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function clearCsrfToken(): void {
+  sessionCsrfToken = null;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('csrf_token');
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function setSimulateCsrfError(simulate: boolean): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      if (simulate) {
+        localStorage.setItem('SIMULATE_CSRF_ERROR', 'true');
+      } else {
+        localStorage.removeItem('SIMULATE_CSRF_ERROR');
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export class ApiClient {
   private client: AxiosInstance;
   private refreshTokenPromise: Promise<string> | null = null;
 
@@ -30,22 +103,41 @@ class ApiClient {
   }
 
   private setupInterceptors() {
-    // Request interceptor - add auth token from auth store (IndexedDB-backed)
+    // Request interceptor - add auth token and CSRF token
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const accessToken = this.getAccessToken();
         if (accessToken && config.headers) {
           config.headers.Authorization = `Bearer ${accessToken}`;
         }
+
+        // Attach CSRF Token to requests
+        const csrfToken = getCsrfToken();
+        if (csrfToken && config.headers) {
+          config.headers['X-CSRF-Token'] = csrfToken;
+        }
+
+        // Check development error simulation
+        let simulateCsrfError = false;
+        try {
+          simulateCsrfError = typeof localStorage !== 'undefined' && localStorage.getItem('SIMULATE_CSRF_ERROR') === 'true';
+        } catch {
+          // ignore
+        }
+
+        if (simulateCsrfError && config.headers) {
+          config.headers['X-Simulate-CSRF-Error'] = 'true';
+        }
+
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor - handle token refresh
+    // Response interceptor - handle token refresh and CSRF errors
     this.client.interceptors.response.use(
       (response) => response,
-      async (error: AxiosError<ApiResponse<unknown>>) => {
+      async (error: AxiosError<ApiResponse<unknown> | { code?: string; message?: string }>) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -65,7 +157,17 @@ class ApiClient {
           }
         }
 
-        return Promise.reject(this.normalizeError(error));
+        // Handle CSRF verification failure (HTTP 403 CSRF_INVALID)
+        if (error.response?.status === 403) {
+          const resData = error.response.data as (ApiResponse<unknown> & { code?: string; message?: string }) | undefined;
+          const errorCode = resData?.error?.code || resData?.code;
+          if (errorCode === 'CSRF_INVALID') {
+            clearCsrfToken();
+            return Promise.reject(this.normalizeError(error as AxiosError<ApiResponse<unknown>>));
+          }
+        }
+
+        return Promise.reject(this.normalizeError(error as AxiosError<ApiResponse<unknown>>));
       }
     );
   }
@@ -98,9 +200,19 @@ class ApiClient {
     }
   }
 
-  private normalizeError(error: AxiosError<ApiResponse<unknown>>): ApiError {
+  private normalizeError(
+    error: AxiosError<{ error?: ApiError; code?: string; message?: string; details?: Record<string, unknown> }>
+  ): ApiError {
     if (error.response?.data?.error) {
       return error.response.data.error;
+    }
+
+    if (error.response?.data?.code && error.response?.data?.message) {
+      return {
+        code: error.response.data.code,
+        message: error.response.data.message,
+        details: error.response.data.details,
+      };
     }
 
     if (error.code === 'ECONNABORTED') {
@@ -112,8 +224,8 @@ class ApiClient {
     }
 
     return {
-      code: error.response.data?.error?.code || 'UNKNOWN_ERROR',
-      message: error.response.data?.error?.message || '發生未知錯誤',
+      code: error.response.data?.error?.code || error.response.data?.code || 'UNKNOWN_ERROR',
+      message: error.response.data?.error?.message || error.response.data?.message || '發生未知錯誤',
     };
   }
 
@@ -141,6 +253,13 @@ class ApiClient {
   async delete<T>(url: string, data?: unknown) {
     const response = await this.client.delete<ApiResponse<T>>(url, { data });
     return response.data;
+  }
+
+  async postBlob(url: string, data?: unknown): Promise<Blob> {
+    const response = await this.client.post(url, data, {
+      responseType: 'blob',
+    });
+    return response.data as Blob;
   }
 }
 

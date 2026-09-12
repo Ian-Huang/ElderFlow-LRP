@@ -96,9 +96,16 @@
   4. 詳細操作與重整流程見 `downloaded-system/README.md`。
 
 ### 評鑑報表工具箱 (Audit Toolkit)
-- **定義**：為應對長照評鑑時效性與解決舊系統難用引發的「影子 IT」問題所設立的實用主義過渡專區。提供純前端無伺服器依賴的 A4 評鑑報表產製引擎，支援標準 CSV 範本下載、歷史資料批次匯入、動態表頭編輯 (contenteditable) 與高保真 A4 直向/橫向列印，並具備平滑升級對接系統資料庫的能力。
-- **關鍵模組**：AuditToolkitPage, RepairReportPrintView, CsvParserEngine
-- **業務規則**：所有 CSV 解析必須在瀏覽器本機端完成不得洩漏個資；輸出之紙本與 PDF 必須嚴格符合衛福部評鑑追蹤格式與 A4 換頁不腰斬標準。
+- **定義**：為應對長照評鑑時效性與解決舊系統難用引發的「影子 IT」問題所設立的實用主義過渡專區。提供純前端無伺服器依賴的 A4 評鑑報表產製引擎，支援標準 CSV 範本下載、歷史資料批次匯入、動態表頭編輯 (contenteditable) 與高保真 A4 直向/橫向滿版列印，並具備平滑升級對接系統資料庫的能力。
+- **架構與開發指引**：詳見專案規範文件 [`docs/audit-toolkit-guide.md`](file:///Users/ian.huang/aiProjects/LRP/docs/audit-toolkit-guide.md)。
+- **關鍵模組**：`reportRegistry.ts`, `AuditReportDispatcher.tsx`, `AuditToolkitHub.tsx`, `AuditReportShell.tsx`, `SanitationReportPrintView.tsx`, `RepairReportPrintView.tsx`, `CsvParserEngine`
+- **核心業務與合規規則**：
+  1. **未來時間嚴禁預勾**：評鑑合規防呆，未來的時間絕對不可預打勾或預簽名；「一鍵打勾」與預設值僅限於今天與過去日期（`isFutureDate`）。
+  2. **擬真手寫人味打勾**：統一使用 `HandwrittenCheck` 搭配 FNV-1a 跨月動態種子（`getHandwrittenSeed`），提供 14 種手寫路徑與旋轉/縮放/位移多維度自然隨機性，嚴禁每個月同一天千篇一律。
+  3. **A4 滿版列印**：直向單頁規格 `height: 1123px; flex justify-between; margin: 4mm 6mm;`，嚴格達成一頁滿版零空白且不溢出第二頁。
+  4. **簽名欄位合併留白**：班別簽名欄日夜合併（`colspan="2"`），預設保持空白以供現場親簽，不蓋假印章。
+  5. **隱私與本機執行**：所有 CSV 解析與報表運算必須在瀏覽器本機端完成，不得洩漏個資。
+  6. **擴充模式**：新增任何報表必須透過 `reportRegistry` 註冊，自動連動 Hub 首頁與動態分發路由。
 
 ## 實體關係
 

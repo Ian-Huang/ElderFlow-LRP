@@ -504,39 +504,172 @@ function MedicationsTab({ residentId, medications }: { residentId: string; medic
 }
 
 function CarePlansTab({ residentId, plans }: { residentId: string; plans?: CarePlan[] }) {
+  const activePlan = plans?.find((p) => p.status === 'Active');
+  const otherPlans = plans?.filter((p) => p.planId !== activePlan?.planId) || [];
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold text-gray-900">個別化照護計畫</h3>
-        <Link to={`/care-plans?residentId=${residentId}`} className="btn-secondary text-xs py-1.5 px-3">
-          前往照護計畫頁
-        </Link>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-gray-900">個別化照護計畫</h3>
+          <p className="text-xs text-gray-500 mt-0.5">跨專業照護目標設定、執行進度量化與排程追蹤</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/care-plans/new?residentId=${residentId}`}
+            className="btn-primary text-xs py-1.5 px-3"
+          >
+            為此住民建立新計畫
+          </Link>
+          <Link
+            to={`/care-plans?residentId=${residentId}`}
+            className="btn-secondary text-xs py-1.5 px-3"
+          >
+            前往計畫列表
+          </Link>
+        </div>
       </div>
 
-      {!plans || plans.length === 0 ? (
-        <div className="text-center py-10 bg-gray-50 rounded-xl text-gray-500">
-          <DocumentIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" aria-hidden="true" />
-          <p>目前尚無生效之個別照護計畫</p>
+      {/* Embedded Active Care Plan Summary Card */}
+      {activePlan ? (
+        <div className="card p-5 border-2 border-primary-500/30 bg-gradient-to-br from-primary-50/20 via-white to-white shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                當前啟用中計畫
+              </span>
+              <span className="font-mono font-bold text-gray-900 text-sm">{activePlan.planId}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">
+                複審日期：<span className="font-semibold text-gray-700">{formatDate(activePlan.reviewDate)}</span>
+              </span>
+              <Link
+                to={`/care-plans/${activePlan.planId}`}
+                className="btn-primary text-xs py-1 px-3 inline-flex items-center"
+              >
+                查看完整計畫 →
+              </Link>
+            </div>
+          </div>
+
+          {/* Active Goals with Progress Bars */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+              照護目標進度 ({activePlan.goals?.length || 0})
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {activePlan.goals?.map((goal, idx) => {
+                const progress = goal.progress ?? 0;
+                return (
+                  <div
+                    key={goal.goalId || idx}
+                    className="p-3 bg-gray-50/80 rounded-xl border border-gray-100 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2">
+                        {goal.description}
+                      </span>
+                      <span className="text-[11px] font-mono font-bold text-primary-700 whitespace-nowrap">
+                        {progress}%
+                      </span>
+                    </div>
+                    {/* Visual Progress Bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
+                      <span>目標日：{formatDate(goal.targetDate)}</span>
+                      <span>{goal.status === 'Achieved' ? '已達成' : '執行中'}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Service Items */}
+          {activePlan.serviceItems && activePlan.serviceItems.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                執行中服務項目 ({activePlan.serviceItems.length})
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {activePlan.serviceItems.map((item, idx) => (
+                  <div
+                    key={item.itemId || idx}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs"
+                  >
+                    <span className="font-bold text-gray-900">{item.name}</span>
+                    <span className="text-primary-700 font-medium">({item.frequency})</span>
+                    {item.responsibleRole && (
+                      <span className="text-gray-400 text-[11px]">· {item.responsibleRole}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {plans.map((p) => (
-            <div key={p.planId} className="p-4 border rounded-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-gray-900">{p.planId}</span>
-                <span className="badge-primary text-xs">{p.status}</span>
-              </div>
-              <p className="text-xs text-gray-600">評估日期：{formatDate(p.assessmentDate)} · 審閱日期：{formatDate(p.reviewDate)}</p>
-              {p.goals && p.goals.length > 0 && (
-                <div className="text-xs bg-gray-50 p-2 rounded">
-                  <span className="font-bold text-gray-700">目標：</span>
-                  {p.goals.map((g, idx) => (
-                    <span key={idx} className="ml-1 text-gray-600">{g.description}</span>
-                  ))}
+        <div className="card p-8 text-center bg-gray-50/70 border border-dashed border-gray-300 rounded-2xl space-y-3">
+          <DocumentIcon className="w-10 h-10 mx-auto text-gray-300" aria-hidden="true" />
+          <p className="font-semibold text-gray-700">目前尚無執行中的個別化照護計畫</p>
+          <p className="text-xs text-gray-400 max-w-sm mx-auto">
+            建議依住民評估結果，盡速制定照護計畫與服務項目排程。
+          </p>
+          <Link
+            to={`/care-plans/new?residentId=${residentId}`}
+            className="btn-primary text-xs inline-block mt-2"
+          >
+            為此住民建立新計畫
+          </Link>
+        </div>
+      )}
+
+      {/* Historical / Other Plans */}
+      {otherPlans.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+            其他歷程計畫 ({otherPlans.length})
+          </h4>
+          <div className="space-y-2.5">
+            {otherPlans.map((p) => (
+              <div
+                key={p.planId}
+                className="p-3.5 border rounded-xl bg-white hover:bg-gray-50 transition-colors flex items-center justify-between gap-3 text-xs"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-gray-900">{p.planId}</span>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        p.status === 'Completed'
+                          ? 'bg-blue-50 text-blue-700'
+                          : p.status === 'Draft'
+                          ? 'bg-gray-100 text-gray-700'
+                          : 'bg-purple-50 text-purple-700'
+                      }`}
+                    >
+                      {p.status === 'Completed' ? '已完成' : p.status === 'Draft' ? '草稿' : '已封存'}
+                    </span>
+                  </div>
+                  <p className="text-gray-500">
+                    評估：{formatDate(p.assessmentDate)} · 複審：{formatDate(p.reviewDate)}
+                  </p>
                 </div>
-              )}
-            </div>
-          ))}
+                <Link
+                  to={`/care-plans/${p.planId}`}
+                  className="btn-secondary text-xs py-1 px-2.5 whitespace-nowrap"
+                >
+                  查看明細
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

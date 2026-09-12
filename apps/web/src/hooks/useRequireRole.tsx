@@ -7,7 +7,7 @@ import { hasMinRole as hasMinRoleUtil } from '@/utils/roles';
 /**
  * Hook to check if current user has required roles
  */
-export function useRequireRole(allowedRoles: UserRole[], redirectTo: string = '/dashboard') {
+export function useRequireRole(allowedRoles: UserRole[], redirectTo: string = '/403') {
   const { isAuthenticated, isInitialized, userRole, hasRole } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,7 +24,7 @@ export function useRequireRole(allowedRoles: UserRole[], redirectTo: string = '/
 
     // Check role permissions
     if (userRole && !hasRole(allowedRoles)) {
-      navigate(redirectTo, { replace: true });
+      navigate(redirectTo, { replace: true, state: { from: location.pathname } });
     }
   }, [isInitialized, isAuthenticated, userRole, allowedRoles, hasRole, navigate, location, redirectTo]);
 
@@ -59,7 +59,7 @@ export function useHasRole() {
 export function requireRole<P extends object>(
   allowedRoles: UserRole[],
   WrappedComponent: React.ComponentType<P>,
-  redirectTo: string = '/dashboard'
+  redirectTo: string = '/403'
 ) {
   return function RequireRoleWrapper(props: P) {
     const { isAllowed, isLoading } = useRequireRole(allowedRoles, redirectTo);

@@ -237,20 +237,34 @@ export interface MedicationAdministrationCreateInput {
 // ========== 照護計畫 ==========
 export type CarePlanStatus = 'Draft' | 'Active' | 'Completed' | 'Archived';
 
+export type ServiceType =
+  | 'PhysicalTherapy'
+  | 'SpeechTherapy'
+  | 'NutritionCounseling'
+  | 'Rehabilitation'
+  | 'NursingCare'
+  | 'DailyCare'
+  | 'SocialWork'
+  | 'Other';
+
 export interface CareGoal {
   goalId: string;
   description: string;
   targetDate: string;
+  progress?: number;
   status: 'NotStarted' | 'InProgress' | 'Achieved' | 'NotAchieved';
-  progressNotes: string;
+  progressNotes?: string;
 }
 
 export interface ServiceItem {
   itemId: string;
   name: string;
+  serviceType?: ServiceType;
   frequency: string;
   responsibleRole: 'Nurse' | 'Caregiver' | 'Therapist' | 'SocialWorker' | 'Doctor';
-  notes: string;
+  startDate?: string;
+  endDate?: string | null;
+  notes?: string;
 }
 
 export interface CarePlan {
@@ -262,6 +276,8 @@ export interface CarePlan {
   reviewDate: string;
   status: CarePlanStatus;
   createdBy: string;
+  residentName?: string;
+  bedNumber?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -343,6 +359,58 @@ export interface User {
   avatarUrl?: string;
   lastLoginAt?: string;
   createdAt: string;
+  isActive?: boolean;
+  status?: 'active' | 'inactive';
+}
+
+export interface UserCreateInput {
+  username: string;
+  password?: string;
+  name: string;
+  role: UserRole;
+  isLocalStaff: boolean;
+}
+
+export interface UserUpdateRoleInput {
+  role: UserRole;
+}
+
+export interface UserUpdateStatusInput {
+  status: 'active' | 'inactive';
+  isActive?: boolean;
+}
+
+export interface SystemSettings {
+  syncIntervalSeconds: number;
+  lockDurationHours: number;
+  lowStockThreshold: number;
+  pdfFont: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface SystemHealthReport {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  uptimeSeconds: number;
+  services: {
+    api: { status: 'up' | 'down'; latencyMs: number };
+    database: { status: 'up' | 'down'; latencyMs: number };
+    serviceWorker: { status: 'active' | 'inactive'; version: string };
+    indexedDb: { status: 'connected' | 'error'; sizeEstimateBytes: number };
+  };
+  metrics: {
+    memoryUsageMb: number;
+    cpuLoadPercentage: number;
+  };
+}
+
+export interface FeatureFlag {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  rolloutPercentage: number;
+  environment: 'development' | 'staging' | 'production' | 'all';
 }
 
 export interface AuthTokens {
@@ -372,6 +440,48 @@ export interface Report {
   filePath?: string;
   parameters: Record<string, unknown>;
   data?: unknown;
+}
+
+export interface DailyCompletionReport {
+  date: string;
+  totalResidents: number;
+  completedRecords: number;
+  averageCompletionRate: number;
+  statusDistribution: { status: string; count: number; percentage: number }[];
+  residentScores: { residentId: string; residentName: string; bedNumber: string; completionRate: number }[];
+  lowScoreResidents: { residentId: string; residentName: string; bedNumber: string; completionRate: number; missingItems: string[] }[];
+}
+
+export interface ResidentSummaryReport {
+  totalResidents: number;
+  tubeStats: {
+    totalWithTubes: number;
+    nasogastric: number;
+    urinaryCatheter: number;
+    tracheostomy: number;
+    threePipeCount: number;
+  };
+  bedOccupancy: { floor: string; room: string; bedNumber: string; residentName?: string; status: 'occupied' | 'vacant' | 'maintenance' }[];
+  dependencyDistribution: Record<string, number>;
+  alertsSummary: { red: number; yellow: number };
+}
+
+export interface AlertReportItem {
+  id: string;
+  type: 'medication_error' | 'vital_abnormal' | 'fall' | 'missed_care';
+  severity: 'red' | 'yellow';
+  title: string;
+  description: string;
+  residentId: string;
+  residentName: string;
+  bedNumber: string;
+  occurredAt: string;
+  status: 'open' | 'acknowledged' | 'resolved';
+}
+
+export interface PdfExportRequest {
+  reportType: 'resident-list' | 'tube-statistics' | 'bed-map' | 'completion-report' | 'audit-trail';
+  parameters?: Record<string, unknown>;
 }
 
 // ========== 合規檢核 ==========
@@ -514,21 +624,209 @@ export const MedicationAdministrationSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-export const CarePlanCreateSchema = z.object({
-  residentId: z.string().min(1, '住民 ID 為必填'),
-  assessmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  goals: z.array(z.object({
-    description: z.string().min(1, '目標描述必填').max(500),
-    targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    status: z.enum(['NotStarted', 'InProgress', 'Achieved', 'NotAchieved']).default('NotStarted'),
-    progressNotes: z.string().max(1000).optional(),
-  })).min(1, '至少需要一個照護目標'),
-  serviceItems: z.array(z.object({
-    name: z.string().min(1, '服務項目名稱必填').max(100),
-    frequency: z.string().min(1, '頻率必填').max(50),
-    responsibleRole: z.enum(['Nurse', 'Caregiver', 'Therapist', 'SocialWorker', 'Doctor']),
-    notes: z.string().max(500).optional(),
-  })).min(1, '至少需要一個服務項目'),
-  reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  createdBy: z.string().min(1, '建立者必填'),
+export const CarePlanCreateSchema = z
+  .object({
+    residentId: z.string().min(1, '住民 ID 為必填'),
+    assessmentDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, '評估日期格式錯誤 (YYYY-MM-DD)')
+      .refine((date) => {
+        const today = new Date().toISOString().split('T')[0] ?? '';
+        return date <= today;
+      }, '評估日期不得為未來日期'),
+    goals: z
+      .array(
+        z.object({
+          description: z.string().min(1, '目標描述必填').max(500),
+          targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '目標日期格式錯誤 (YYYY-MM-DD)'),
+          progress: z.coerce.number().min(0, '進度最低為 0%').max(100, '進度最高為 100%').default(0),
+          status: z.enum(['NotStarted', 'InProgress', 'Achieved', 'NotAchieved']).default('NotStarted'),
+          progressNotes: z.string().max(1000).optional().default(''),
+        })
+      )
+      .min(1, '至少需要一個照護目標'),
+    serviceItems: z
+      .array(
+        z.object({
+          name: z.string().min(1, '服務項目名稱必填').max(100),
+          serviceType: z
+            .enum([
+              'PhysicalTherapy',
+              'SpeechTherapy',
+              'NutritionCounseling',
+              'Rehabilitation',
+              'NursingCare',
+              'DailyCare',
+              'SocialWork',
+              'Other',
+            ])
+            .optional()
+            .default('Other'),
+          frequency: z.string().min(1, '頻率必填').max(50),
+          responsibleRole: z
+            .enum(['Nurse', 'Caregiver', 'Therapist', 'SocialWorker', 'Doctor'])
+            .default('Caregiver'),
+          startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '起始日期格式錯誤').optional(),
+          endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '結束日期格式錯誤').nullable().optional(),
+          notes: z.string().max(500).optional().default(''),
+        })
+      )
+      .min(1, '至少需要一個服務項目'),
+    reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '複審日期格式錯誤 (YYYY-MM-DD)'),
+    createdBy: z.string().min(1, '建立者必填'),
+  })
+  .refine(
+    (data) => {
+      if (data.assessmentDate && data.reviewDate) {
+        return data.reviewDate >= data.assessmentDate;
+      }
+      return true;
+    },
+    {
+      message: '複審日期不得早於評估日期',
+      path: ['reviewDate'],
+    }
+  );
+
+// ========== 報表與系統管理 Zod 驗證 Schema ==========
+export const DailyCompletionReportSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式錯誤 (YYYY-MM-DD)'),
+  totalResidents: z.number().int().nonnegative(),
+  completedRecords: z.number().int().nonnegative(),
+  averageCompletionRate: z.number().min(0).max(100),
+  statusDistribution: z.array(
+    z.object({
+      status: z.string(),
+      count: z.number().int().nonnegative(),
+      percentage: z.number().min(0).max(100),
+    })
+  ),
+  residentScores: z.array(
+    z.object({
+      residentId: z.string(),
+      residentName: z.string(),
+      bedNumber: z.string(),
+      completionRate: z.number().min(0).max(100),
+    })
+  ),
+  lowScoreResidents: z.array(
+    z.object({
+      residentId: z.string(),
+      residentName: z.string(),
+      bedNumber: z.string(),
+      completionRate: z.number().min(0).max(100),
+      missingItems: z.array(z.string()),
+    })
+  ),
+});
+
+export const ResidentSummaryReportSchema = z.object({
+  totalResidents: z.number().int().nonnegative(),
+  tubeStats: z.object({
+    totalWithTubes: z.number().int().nonnegative(),
+    nasogastric: z.number().int().nonnegative(),
+    urinaryCatheter: z.number().int().nonnegative(),
+    tracheostomy: z.number().int().nonnegative(),
+    threePipeCount: z.number().int().nonnegative(),
+  }),
+  bedOccupancy: z.array(
+    z.object({
+      floor: z.string(),
+      room: z.string(),
+      bedNumber: z.string(),
+      residentName: z.string().optional(),
+      status: z.enum(['occupied', 'vacant', 'maintenance']),
+    })
+  ),
+  dependencyDistribution: z.record(z.string(), z.number().int().nonnegative()),
+  alertsSummary: z.object({
+    red: z.number().int().nonnegative(),
+    yellow: z.number().int().nonnegative(),
+  }),
+});
+
+export const AlertReportItemSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['medication_error', 'vital_abnormal', 'fall', 'missed_care']),
+  severity: z.enum(['red', 'yellow']),
+  title: z.string().min(1),
+  description: z.string(),
+  residentId: z.string().min(1),
+  residentName: z.string().min(1),
+  bedNumber: z.string().min(1),
+  occurredAt: z.string(),
+  status: z.enum(['open', 'acknowledged', 'resolved']),
+});
+
+export const PdfExportRequestSchema = z.object({
+  reportType: z.enum(['resident-list', 'tube-statistics', 'bed-map', 'completion-report', 'audit-trail']),
+  parameters: z.record(z.unknown()).optional(),
+});
+
+export const UserRoleSchema = z.enum(['caregiver', 'supervisor', 'admin', 'sysadmin']);
+
+export const UserCreateSchema = z.object({
+  username: z.string().min(3, '帳號至少需 3 個字元').max(50),
+  password: z.string().min(6, '密碼至少需 6 個字元').optional(),
+  name: z.string().min(1, '姓名為必填').max(50),
+  role: UserRoleSchema,
+  isLocalStaff: z.boolean(),
+});
+
+export const UserUpdateRoleSchema = z.object({
+  role: UserRoleSchema,
+});
+
+export const UserUpdateStatusSchema = z
+  .object({
+    status: z.enum(['active', 'inactive']).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((data) => data.status !== undefined || data.isActive !== undefined, {
+    message: 'status 或 isActive 至少需提供一項',
+  });
+
+export const SystemSettingsSchema = z.object({
+  syncIntervalSeconds: z.number().int().min(5, '同步間隔至少需 5 秒').max(3600, '同步間隔不可超過 3600 秒'),
+  lockDurationHours: z.number().int().min(1, '鎖定時長至少需 1 小時').max(72, '鎖定時長不可超過 72 小時'),
+  lowStockThreshold: z.number().int().min(1, '低庫存閾值至少需為 1').max(500),
+  pdfFont: z.string().min(1, 'PDF 字體為必填'),
+  updatedAt: z.string(),
+  updatedBy: z.string(),
+});
+
+export const SystemHealthReportSchema = z.object({
+  status: z.enum(['healthy', 'degraded', 'unhealthy']),
+  uptimeSeconds: z.number().nonnegative(),
+  services: z.object({
+    api: z.object({
+      status: z.enum(['up', 'down']),
+      latencyMs: z.number().nonnegative(),
+    }),
+    database: z.object({
+      status: z.enum(['up', 'down']),
+      latencyMs: z.number().nonnegative(),
+    }),
+    serviceWorker: z.object({
+      status: z.enum(['active', 'inactive']),
+      version: z.string(),
+    }),
+    indexedDb: z.object({
+      status: z.enum(['connected', 'error']),
+      sizeEstimateBytes: z.number().nonnegative(),
+    }),
+  }),
+  metrics: z.object({
+    memoryUsageMb: z.number().nonnegative(),
+    cpuLoadPercentage: z.number().min(0).max(100),
+  }),
+});
+
+export const FeatureFlagSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string(),
+  enabled: z.boolean(),
+  rolloutPercentage: z.number().min(0).max(100),
+  environment: z.enum(['development', 'staging', 'production', 'all']),
 });

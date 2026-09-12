@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { CsvParserEngine } from '@/utils/csvParserEngine';
 import '@/styles/print.css';
 import type { AuditReportConfig } from './auditToolkitTypes';
-import { DownloadIcon, UploadIcon, PrintIcon } from './icons';
+import { DownloadIcon, UploadIcon, PrintIcon, ArrowLeftIcon } from './icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -18,6 +18,10 @@ export interface AuditReportShellProps {
   onImport: (rows: Record<string, string>[]) => void;
   /** 額外工具列操作元件（例如：模擬新增一筆資料按鈕） */
   extraActions?: React.ReactNode;
+  /** 返回按鈕目標連結（預設 '/audit-toolkit'，設為 null 隱藏） */
+  backUrl?: string | null;
+  /** 返回按鈕點擊事件（可選，如 SPA 路由導向） */
+  onBack?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,7 +41,14 @@ export interface AuditReportShellProps {
  *
  * 列印時 @page 由此元件透過行內 <style> 注入，以支援直向/橫向並存。
  */
-export function AuditReportShell({ config, rows, onImport, extraActions }: AuditReportShellProps) {
+export function AuditReportShell({
+  config,
+  rows,
+  onImport,
+  extraActions,
+  backUrl = '/audit-toolkit',
+  onBack,
+}: AuditReportShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   // Local title and orgName state: prevents React re-render from overwriting user's contenteditable edits
@@ -124,7 +135,24 @@ export function AuditReportShell({ config, rows, onImport, extraActions }: Audit
         className="no-print flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10"
         data-testid="audit-toolbar"
       >
-        <div className="flex items-center gap-2 flex-1">
+        <div className="flex items-center gap-3 flex-1">
+          {backUrl !== null && (
+            <a
+              href={backUrl}
+              onClick={(e) => {
+                if (onBack) {
+                  e.preventDefault();
+                  onBack();
+                }
+              }}
+              className="btn btn-secondary text-xs flex items-center gap-1.5"
+              data-testid="btn-back-to-hub"
+              aria-label="返回工具箱總覽"
+            >
+              <ArrowLeftIcon className="w-3.5 h-3.5" />
+              <span>返回工具箱</span>
+            </a>
+          )}
           <span className="text-sm font-medium text-gray-700">
             共 <span className="font-bold text-primary-600" data-testid="row-count">{rows.length}</span> 筆
           </span>
