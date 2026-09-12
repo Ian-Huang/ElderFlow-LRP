@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { CsvParserEngine } from '@/utils/csvParserEngine';
 import '@/styles/print.css';
 import type { AuditReportConfig } from './auditToolkitTypes';
+import { DownloadIcon, UploadIcon, PrintIcon } from './icons';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -221,7 +222,7 @@ export function AuditReportShell({ config, rows, onImport, extraActions }: Audit
                   className="border border-black bg-white px-2 py-1.5 font-bold text-center text-xs"
                   style={{
                     width: col.widthPercent ? `${col.widthPercent}%` : undefined,
-                    textAlign: col.align ?? 'center',
+                    textAlign: 'center',
                   }}
                 >
                   {col.label}
@@ -264,36 +265,5 @@ export function AuditReportShell({ config, rows, onImport, extraActions }: Audit
         </table>
       </div>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Inline SVG icons (no extra deps, tree-shakable)
-// ---------------------------------------------------------------------------
-
-function DownloadIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-    </svg>
-  );
-}
-
-function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-    </svg>
-  );
-}
-
-function PrintIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-    </svg>
   );
 }

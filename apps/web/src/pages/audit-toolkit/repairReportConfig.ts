@@ -1,4 +1,17 @@
-import type { AuditReportConfig } from './auditToolkitTypes';
+import type { AuditReportConfig, AuditColumnDef } from './auditToolkitTypes';
+
+/** 修繕紀錄領域型別 */
+export interface RepairRecord {
+  date: string;
+  time: string;
+  reporter: string;
+  reason: string;
+  auditor?: string;
+  repairAction?: string;
+  completedDate?: string;
+  completedTime?: string;
+  [key: string]: string | undefined;
+}
 
 /**
  * 8 欄黃金比例欄位定義：
@@ -12,15 +25,15 @@ import type { AuditReportConfig } from './auditToolkitTypes';
  * 8. 時間(完) (7%, 置中)
  * 寬度百分比總和剛好 100%。
  */
-export const repairReportColumns = [
-  { key: 'date', label: '日期', required: true, widthPercent: 11, align: 'center' as const },
-  { key: 'time', label: '時間', required: true, widthPercent: 7, align: 'center' as const },
-  { key: 'reporter', label: '通報人員', required: true, widthPercent: 10, align: 'center' as const },
-  { key: 'reason', label: '事由', required: true, widthPercent: 35, align: 'left' as const },
-  { key: 'auditor', label: '稽核', required: false, widthPercent: 9, align: 'center' as const },
-  { key: 'action', label: '修繕', required: false, widthPercent: 12, align: 'center' as const },
-  { key: 'completedDate', label: '日期(完)', required: false, widthPercent: 9, align: 'center' as const },
-  { key: 'completedTime', label: '時間(完)', required: false, widthPercent: 7, align: 'center' as const },
+export const repairReportColumns: AuditColumnDef[] = [
+  { key: 'date', label: '日期', required: true, widthPercent: 11, align: 'center' },
+  { key: 'time', label: '時間', required: true, widthPercent: 7, align: 'center' },
+  { key: 'reporter', label: '通報人員', required: true, widthPercent: 10, align: 'center' },
+  { key: 'reason', label: '事由', required: true, widthPercent: 35, align: 'left' },
+  { key: 'auditor', label: '稽核', required: false, widthPercent: 9, align: 'center' },
+  { key: 'repairAction', label: '修繕', required: false, widthPercent: 12, align: 'center' },
+  { key: 'completedDate', label: '日期(完)', required: false, widthPercent: 9, align: 'center' },
+  { key: 'completedTime', label: '時間(完)', required: false, widthPercent: 7, align: 'center' },
 ];
 
 /** 6 筆長照真實情境預設範例資料 */
@@ -31,6 +44,7 @@ export const defaultRepairSampleData: Record<string, string>[] = [
     reporter: '黃郁婷',
     reason: '護理站鍵盤無法使用',
     auditor: '趙芬蘭',
+    repairAction: '購新',
     action: '購新',
     completedDate: '2026/09/02',
     completedTime: '08:00',
@@ -41,6 +55,7 @@ export const defaultRepairSampleData: Record<string, string>[] = [
     reporter: '陳美玲',
     reason: '203房 2床 床頭緊急呼叫鈴按鈕接觸不良',
     auditor: '趙芬蘭',
+    repairAction: '更換微動開關',
     action: '更換微動開關',
     completedDate: '2026/09/03',
     completedTime: '11:30',
@@ -51,6 +66,7 @@ export const defaultRepairSampleData: Record<string, string>[] = [
     reporter: '張建志',
     reason: '106房 王奶奶輪椅右側煞車夾片鬆動，推行易滑動',
     auditor: '趙芬蘭',
+    repairAction: '調整鎖緊並實測煞車',
     action: '調整鎖緊並實測煞車',
     completedDate: '2026/09/05',
     completedTime: '15:00',
@@ -61,6 +77,7 @@ export const defaultRepairSampleData: Record<string, string>[] = [
     reporter: '李秀英',
     reason: '2F多功能活動室冷氣室內機出風口凝結滴水',
     auditor: '趙芬蘭',
+    repairAction: '清通排水軟管管線',
     action: '清通排水軟管管線',
     completedDate: '2026/09/08',
     completedTime: '10:20',
@@ -71,6 +88,7 @@ export const defaultRepairSampleData: Record<string, string>[] = [
     reporter: '黃郁婷',
     reason: '公用無障礙洗手間L型安全扶手固定膨脹螺絲鬆動',
     auditor: '趙芬蘭',
+    repairAction: '重新補膠固定螺栓',
     action: '重新補膠固定螺栓',
     completedDate: '2026/09/10',
     completedTime: '14:00',
@@ -81,6 +99,7 @@ export const defaultRepairSampleData: Record<string, string>[] = [
     reporter: '王宗翰',
     reason: '1F 後側避難走道應急照明指示燈閃爍不亮',
     auditor: '趙芬蘭',
+    repairAction: '更換LED蓄電池燈組',
     action: '更換LED蓄電池燈組',
     completedDate: '2026/09/12',
     completedTime: '09:10',
@@ -97,6 +116,7 @@ export const mockRepairPool: Record<string, string>[] = [
     reporter: '林秀玲',
     reason: '301房 洗手台冷熱水水龍頭滴漏',
     auditor: '趙芬蘭',
+    repairAction: '更換止水皮墊',
     action: '更換止水皮墊',
     completedDate: '2026/09/13',
     completedTime: '14:30',
@@ -107,6 +127,7 @@ export const mockRepairPool: Record<string, string>[] = [
     reporter: '許雅婷',
     reason: '復健區 平行桿固定高度旋鈕滑牙鬆脫',
     auditor: '趙芬蘭',
+    repairAction: '重新攻牙並換裝星型旋鈕',
     action: '重新攻牙並換裝星型旋鈕',
     completedDate: '2026/09/16',
     completedTime: '09:00',
@@ -117,6 +138,7 @@ export const mockRepairPool: Record<string, string>[] = [
     reporter: '陳美玲',
     reason: '205房 電動護理床上升段微動開關感應延遲',
     auditor: '趙芬蘭',
+    repairAction: '校準馬達微動開關行程',
     action: '校準馬達微動開關行程',
     completedDate: '2026/09/18',
     completedTime: '11:00',
@@ -127,6 +149,7 @@ export const mockRepairPool: Record<string, string>[] = [
     reporter: '黃郁婷',
     reason: '廚房 靜電油煙處理機運轉有異常金屬摩擦音',
     auditor: '趙芬蘭',
+    repairAction: '軸承潤滑保養與扇葉除垢',
     action: '軸承潤滑保養與扇葉除垢',
     completedDate: '2026/09/21',
     completedTime: '10:00',
@@ -137,6 +160,7 @@ export const mockRepairPool: Record<string, string>[] = [
     reporter: '張建志',
     reason: '5F 護理推車後輪萬向輪軸承卡入棉絮轉向困難',
     auditor: '趙芬蘭',
+    repairAction: '清除異物並補高壓黃油',
     action: '清除異物並補高壓黃油',
     completedDate: '2026/09/22',
     completedTime: '10:15',
@@ -147,6 +171,7 @@ export const mockRepairPool: Record<string, string>[] = [
     reporter: '王宗翰',
     reason: 'B1 避難走道排煙閘門手動拉把鋼索微卡頓',
     auditor: '趙芬蘭',
+    repairAction: '鋼索除鏽上油潤滑測試',
     action: '鋼索除鏽上油潤滑測試',
     completedDate: '2026/09/25',
     completedTime: '16:00',

@@ -2,6 +2,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  RepairReportPrintView,
   RepairReportPage,
   repairReportConfig,
   repairReportColumns,
@@ -41,6 +42,13 @@ describe('repairReportConfig 規範與欄位定義', () => {
     expect(reasonCol?.widthPercent).toBe(35);
     expect(reasonCol?.align).toBe('left');
     expect(reasonCol?.required).toBe(true);
+  });
+
+  it('修繕欄位使用修訂之 repairAction 鍵名', () => {
+    const actionCol = repairReportColumns.find((c) => c.key === 'repairAction');
+    expect(actionCol).toBeDefined();
+    expect(actionCol?.label).toBe('修繕');
+    expect(actionCol?.widthPercent).toBe(12);
   });
 
   it('內建 6 筆長照真實情境預設範例資料', () => {
@@ -97,9 +105,9 @@ describe('動態資料池與循環注入演算法', () => {
   });
 });
 
-describe('RepairReportPage 元件渲染與互動', () => {
+describe('RepairReportPrintView 元件渲染與互動', () => {
   it('初始載入 6 筆長照預設資料，筆數顯示「共 6 筆」', () => {
-    render(<RepairReportPage />);
+    render(<RepairReportPrintView />);
     expect(screen.getByTestId('row-count')).toHaveTextContent('6');
     expect(screen.getByText('護理站鍵盤無法使用')).toBeInTheDocument();
     expect(
@@ -107,8 +115,13 @@ describe('RepairReportPage 元件渲染與互動', () => {
     ).toBeInTheDocument();
   });
 
-  it('渲染機構全銜與報表標題，且具備 contenteditable="true"', () => {
+  it('支援別名 RepairReportPage', () => {
     render(<RepairReportPage />);
+    expect(screen.getByTestId('row-count')).toHaveTextContent('6');
+  });
+
+  it('渲染機構全銜與報表標題，且具備 contenteditable="true"', () => {
+    render(<RepairReportPrintView />);
     const orgEl = screen.getByTestId('report-org-name');
     const titleEl = screen.getByTestId('report-title');
 
@@ -119,19 +132,28 @@ describe('RepairReportPage 元件渲染與互動', () => {
     expect(titleEl).toHaveAttribute('contenteditable', 'true');
   });
 
+  it('所有表頭欄位（含「事由」）嚴格置中對齊 (text-align: center)', () => {
+    render(<RepairReportPrintView />);
+    const thElements = screen.getAllByRole('columnheader');
+    expect(thElements).toHaveLength(8);
+    thElements.forEach((th) => {
+      expect(th).toHaveStyle({ textAlign: 'center' });
+    });
+  });
+
   it('表格套用評鑑專用樣式 class（audit-report-table）', () => {
-    render(<RepairReportPage />);
+    render(<RepairReportPrintView />);
     const table = document.querySelector('table');
     expect(table).toHaveClass('audit-report-table');
   });
 
   it('呈現「模擬新增一筆資料」按鈕', () => {
-    render(<RepairReportPage />);
+    render(<RepairReportPrintView />);
     expect(screen.getByTestId('btn-mock-add')).toBeInTheDocument();
   });
 
   it('點擊「模擬新增一筆資料」動態累加資料筆數並顯示新項目', async () => {
-    render(<RepairReportPage />);
+    render(<RepairReportPrintView />);
     const user = userEvent.setup();
     const mockAddBtn = screen.getByTestId('btn-mock-add');
 
@@ -150,7 +172,7 @@ describe('RepairReportPage 元件渲染與互動', () => {
   });
 });
 
-describe('端到端範本與 CSV 匯入整合', () => {
+describe('端到端範本、大批歷史 CSV 匯入與多頁列印驗證', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -176,21 +198,24 @@ describe('端到端範本與 CSV 匯入整合', () => {
     ]);
   });
 
-  it('匯入自訂 CSV 檔案後，表格資料即時替換並更新筆數', async () => {
-    render(<RepairReportPage />);
+  it('匯入幾十筆歷史資料 (50 筆) 能完整渲染並符合多頁列印規範', async () => {
+    render(<RepairReportPrintView />);
 
-    const customCsv = [
-      '日期,時間,通報人員,事由,稽核,修繕,日期(完),時間(完)',
-      '2026/09/28,08:30,測試員A,701房 測試呼叫鈴,督導A,檢測正常,2026/09/28,09:00',
-      '2026/09/29,14:00,測試員B,702房 測試冷氣濾網,督導A,清洗完畢,2026/09/29,15:00',
-    ].join('\r\n');
+    // 構建 50 筆歷史資料 CSV
+    const rows = ['日期,時間,通報人員,事由,稽核,修繕,日期(完),時間(完)'];
+    for (let i = 1; i <= 50; i++) {
+      rows.push(
+        `2026/08/${String((i % 28) + 1).padStart(2, '0')},10:00,照護員${i},第 ${i} 號設施檢查修繕項目,趙芬蘭,檢修完成,2026/08/29,12:00`,
+      );
+    }
+    const largeCsv = rows.join('\r\n');
 
     vi.spyOn(global, 'FileReader').mockImplementationOnce(() => {
       const reader = {
         readAsText: vi.fn(function (this: FileReader) {
           setTimeout(() => {
             const event = {
-              target: { result: customCsv },
+              target: { result: largeCsv },
             } as unknown as ProgressEvent<FileReader>;
             if (typeof this.onload === 'function') this.onload(event);
           }, 0);
@@ -202,18 +227,27 @@ describe('端到端範本與 CSV 匯入整合', () => {
     });
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File([customCsv], 'custom-repairs.csv', { type: 'text/csv' });
+    const file = new File([largeCsv], 'historical-50-repairs.csv', { type: 'text/csv' });
 
     await act(async () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 30));
     });
 
-    // 資料筆數替換為 2 筆
-    expect(screen.getByTestId('row-count')).toHaveTextContent('2');
-    expect(screen.getByText('701房 測試呼叫鈴')).toBeInTheDocument();
-    expect(screen.getByText('702房 測試冷氣濾網')).toBeInTheDocument();
-    // 舊資料已被替換
-    expect(screen.queryByText('護理站鍵盤無法使用')).not.toBeInTheDocument();
+    // 驗證幾十筆資料已全數渲染
+    expect(screen.getByTestId('row-count')).toHaveTextContent('50');
+    const tableRows = document.querySelectorAll('tbody tr');
+    expect(tableRows).toHaveLength(50);
+
+    // 驗證首尾資料正確映射
+    expect(screen.getByText('第 1 號設施檢查修繕項目')).toBeInTheDocument();
+    expect(screen.getByText('第 50 號設施檢查修繕項目')).toBeInTheDocument();
+
+    // 驗證 A4 列印架構：包含 @page A4 portrait 注入與 no-print 工具列
+    const toolbar = screen.getByTestId('audit-toolbar');
+    expect(toolbar).toHaveClass('no-print');
+
+    const styleEl = document.querySelector('style');
+    expect(styleEl?.textContent).toContain('@page { size: A4 portrait;');
   });
 });

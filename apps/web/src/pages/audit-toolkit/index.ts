@@ -12,5 +12,5 @@ export {
   getNextMockRepair,
 } from './repairReportConfig';
 export { reportRegistry } from './reportRegistry';
-export { RepairReportPage } from './RepairReportPage';
-export type { RepairReportPageProps } from './RepairReportPage';
+export { RepairReportPrintView, RepairReportPage } from './RepairReportPrintView';
+export type { RepairRecord } from './repairReportConfig';
