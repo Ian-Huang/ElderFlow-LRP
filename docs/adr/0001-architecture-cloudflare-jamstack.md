@@ -27,7 +27,7 @@
    - 使用 **Cloudflare Pages** 託管 Vite 打包之 React SPA 靜態產物。
    - 享有全球 Anycast CDN 高速分發、零流量費用限制、自動 SSL、與 Git 整合之預覽分支。
 2. **微後端與 API 層 (Serverless API)**：
-   - 使用 **Cloudflare Pages Functions**（位於 `apps/web/functions/api/` 或由 Cloudflare Workers 派送）。
+   - 使用 **Cloudflare Pages Functions**（位於根目錄 `functions/api/`）。
    - 處理使用者身分驗證 (JWT/Session)、RBAC 角色權限防呆、業務邏輯校驗。
 3. **主資料庫 (Cloud Master Database)**：
    - 使用 **Cloudflare D1**（Serverless SQLite 關聯式資料庫）。

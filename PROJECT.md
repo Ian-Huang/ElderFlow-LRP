@@ -4,7 +4,7 @@
 - **Monorepo Structure**: npm workspaces (`apps/web`, `packages/shared`).
 - **Frontend Stack**: React 18.3 + TypeScript 5.4 + Vite 5.2 + Tailwind CSS 3.4.
 - **Hosting & Jamstack Platform**: Cloudflare Pages (Anycast CDN, zero bandwidth cost, automatic branch previews).
-- **Backend & API Layer**: Cloudflare Pages Functions (`apps/web/functions/api`) serverless micro-backend with standard REST API.
+- **Backend & API Layer**: Cloudflare Pages Functions (`functions/api`) serverless micro-backend with standard REST API.
 - **Primary Database**: Cloudflare D1 (Serverless SQLite, high free-tier limits, standard ANSI SQL, easily exportable).
 - **State & Data Fetching**: TanStack React Query 5.28 + Zustand 4.5 + Axios 1.68 + Dexie 4.4 (IndexedDB).
 - **Offline & Sync Strategy**: Hybrid Offline-First — Dexie (IndexedDB) + Service Worker as local resilient cache/buffer, syncing with Cloudflare D1 via standard REST APIs when online (see `docs/adr/0001-architecture-cloudflare-jamstack.md`).

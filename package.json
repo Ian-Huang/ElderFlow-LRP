@@ -14,7 +14,7 @@
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
-    "deploy:pages": "npm run build:web && (cd apps/web && npx wrangler pages deploy dist --project-name=elderflow-lrp --branch=main)",
+    "deploy:pages": "npm run build:web && npx wrangler pages deploy apps/web/dist --project-name=elderflow-lrp --branch=main",
     "prepare": "husky install"
   },
   "devDependencies": {
