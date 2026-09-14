@@ -1,19 +1,16 @@
-# 14 — 日常照護記錄後端 API
+# 14: 日常照護記錄、評分與 24hr 鎖定 API (Care Records & 24hr Lock Engine)
 
-**What to build:** 核心照護記錄後端 API：列表查詢、單筆明細、新建、編輯 (24hr 窗口)、狀態變更、補充修正案 (BR002)、24小時自動鎖定排程、同步端點。嚴格執行 BR001、BR002、BR007。
+**What to build:**
+核心日常照護記錄與生命徵象 REST API，**精準對接前端 `careRecordRepository` 中介層契約**。實作分頁查詢、單筆明細、新增、24 小時內編輯、補充修正案 (BR002)、完整度評分 (0-100) 與 24 小時硬性鎖定機制。
 
 **Blocked by:** 11-backend-foundation, 12-auth-backend
 
 **Status:** ready-for-agent
 
-- [ ] 實作 `GET /api/v1/care-records`：支援 `?residentId=&dateFrom=&dateTo=&status=&staffId=&page=&limit=&sort=`
-- [ ] 實作 `GET /api/v1/care-records/:id`：回傳完整記錄含 activities、evidence、modificationHistory
-- [ ] 實作 `POST /api/v1/care-records`：建立記錄、自動帶入 `staffId`、`staffName`、`timestamp` (ISO 8601)、計算 `completenessScore` (0-100)、初始 `lockType: 'Editable'`、`status: 'Normal'`、寫入稽核軌跡
-- [ ] 實作 `PATCH /api/v1/care-records/:id`：編輯記錄、**僅限 lockType=Editable**、**僅限本人或 supervisor+**、寫入 `modificationHistory` (actionType: Update、舊值/新值/原因必填)、更新 `updatedAt`、版本號 +1
-- [ ] 實作 `POST /api/v1/care-records/:id/status`：變更狀態 (Normal/NeedsReview/VerificationRequired)、寫入稽核軌跡
-- [ ] 實作 `POST /api/v1/care-records/:id/supplement`：補充修正案 (BR002)、**僅限 lockType=Locked**、建立新版本記錄關聯原始、寫入稽核軌跡 (actionType: Supplement)
-- [ ] 實作 `POST /api/v1/care-records/sync`：批次同步端點、接收本地變更陣列、衝突偵測 (version/updatedAt 比對)、回傳 `{ accepted: [], conflicts: SyncConflict[] }`、Server-wins + 本地備份策略
-- [ ] 實作 24小時自動鎖定排程：Azure Timer Trigger (每小時) → 掃描 `submittedAt + 24hr < now` 且 `lockType=Editable` → 更新為 `Locked`、設定 `lockedAt`、產生電子簽章欄位預留
-- [ ] 實作 `completenessScore` 計算：必填項 (活動類型、協助等級、持續時間、生命徵象若類型為 VitalSigns) + 證據存在性 → 0-100 加權
-- [ ] 驗證：timestamp 不得為未來 (+30min 容忍)、活動類型 enum、協助等級 1-5、version 樂觀鎖
-- [ ] 整合測試：建立→編輯(24hr內)→鎖定→補充修正案、稽核軌跡完整性、權限檢查、同步衝突解決
+- [ ] 實作 `GET /api/v1/care-records`：**強制分頁查詢**（`page`, `limit` 預設 20~50），支援 `residentId`, `dateFrom`, `dateTo`, `status`, `staffId` 組合過濾，回傳 `PaginatedResponse<CareRecord>`
+- [ ] **落實大表效能索引**：於 D1 建立 `CREATE INDEX idx_care_records_res_date ON care_records(resident_id, timestamp)` 與 `idx_care_records_lock ON care_records(lock_type, submitted_at)`，確保 20 萬筆數據秒級響應
+- [ ] 實作 `POST /api/v1/care-records`：建立記錄與生命徵象、自動注入 `staffId`、`staffName`、當前時間戳（防呆：時間戳不得為未來 +30 分鐘以上）、後端自動計算 `completenessScore` (0-100)、初始 `lockType: 'Editable'`、寫入 D1 增刪留痕表
+- [ ] 實作 `PATCH /api/v1/care-records/:id`：編輯記錄。**強制時間校驗**：檢查 `submittedAt + 24hr < now`，逾時一律拒絕修改並回傳錯誤碼；僅限未鎖定狀態且由原填寫人或主管編輯，寫入變更前後差異
+- [ ] 實作 `POST /api/v1/care-records/:id/supplement`：補充修正案 (BR002)。當記錄已逾時鎖定，不得覆蓋原始內容，必須建立新版補充案並綁定原記錄 ID
+- [ ] 實作 24 小時動態硬性鎖定機制：查詢與寫入時自動即時判斷 `submittedAt + 24hr`，並可透過 Cloudflare Cron Trigger 定期批次標記 `Locked`
+- [ ] 整合測試：完整驗收建立 → 24 小時內合法編輯 → 24 小時後修改被拒絕 → 補充修正案並存、精準對接 `careRecordRepository`

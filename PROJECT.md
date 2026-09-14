@@ -3,7 +3,12 @@
 ## Architecture
 - **Monorepo Structure**: npm workspaces (`apps/web`, `packages/shared`).
 - **Frontend Stack**: React 18.3 + TypeScript 5.4 + Vite 5.2 + Tailwind CSS 3.4.
+- **Hosting & Jamstack Platform**: Cloudflare Pages (Anycast CDN, zero bandwidth cost, automatic branch previews).
+- **Backend & API Layer**: Cloudflare Pages Functions (`apps/web/functions/api`) serverless micro-backend with standard REST API.
+- **Primary Database**: Cloudflare D1 (Serverless SQLite, high free-tier limits, standard ANSI SQL, easily exportable).
 - **State & Data Fetching**: TanStack React Query 5.28 + Zustand 4.5 + Axios 1.68 + Dexie 4.4 (IndexedDB).
+- **Offline & Sync Strategy**: Hybrid Offline-First — Dexie (IndexedDB) + Service Worker as local resilient cache/buffer, syncing with Cloudflare D1 via standard REST APIs when online (see `docs/adr/0001-architecture-cloudflare-jamstack.md`).
+- **Data Access & Performance**: Frontend Repository Layer (`apps/web/src/repositories`) isolates UI from API/DB. D1 database mandates INDEX on foreign keys/dates (`resident_id`, `recorded_at`, `created_at`) and mandatory pagination (20-50/page) to guarantee fast queries over 200k+ historical rows.
 - **Charts**: Recharts 2.12 (modular, responsive, tree-shakable, fits AC5 performance budget).
 - **Testing**: Vitest 1.6 + React Testing Library + jsdom (Unit & Integration) + Playwright 1.62 (E2E).
 - **Mock Service Layer**: Mock Service Worker (MSW 2.2) integrated in development and test environments.
