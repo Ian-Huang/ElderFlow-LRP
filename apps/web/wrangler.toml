@@ -6,5 +6,5 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "lrp-database"
-database_id = "local-preview-id" # 待建立雲端 D1 後填入真實 Database ID
+database_id = "2f4d6183-d207-4ef9-915c-8ce0cd9bf36e"
 migrations_dir = "./migrations"
