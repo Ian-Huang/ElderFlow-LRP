@@ -46,29 +46,65 @@ export function useSandboxCollection<T extends Record<string, any>>(collectionNa
     }
   }, [collectionName]);
 
-  // 嘗試與雲端 Cloudflare D1 (/api/sandbox/:collection) 背景雙向同步
+  // 嘗試與雲端 Cloudflare D1 (/api/sandbox/:collection) 背景雙向同步（含離線出站補傳）
   const syncCloud = useCallback(async () => {
     if (typeof window === 'undefined' || !navigator.onLine) return;
 
     try {
+      // 1. 先從雲端 D1 下載最新集合清單
       const res = await fetch(`/api/sandbox/${encodeURIComponent(collectionName)}`);
       if (!res.ok) return;
 
-      const body = await res.json();
+      const body = (await res.json()) as {
+        success?: boolean;
+        data?: Array<{ id: string; createdAt?: string; updatedAt?: string; [key: string]: unknown }>;
+      };
+
       if (body?.success && Array.isArray(body.data)) {
-        for (const item of body.data) {
+        const cloudDocs = body.data;
+        const cloudIdSet = new Set(cloudDocs.map((item) => item.id).filter(Boolean));
+
+        // 2. 找出本機 IndexedDB 中尚未同步到雲端的紀錄（離線新增或先前失敗的資料）
+        const localDocs = await sandboxDb.documents
+          .where('collection')
+          .equals(collectionName)
+          .toArray();
+
+        const pendingPushDocs = localDocs.filter((doc) => !cloudIdSet.has(doc.id));
+
+        // 3. 上行補傳（Outbox Push）尚未入庫的本機孤兒紀錄
+        for (const localDoc of pendingPushDocs) {
+          try {
+            await fetch(`/api/sandbox/${encodeURIComponent(collectionName)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: localDoc.id,
+                payload: localDoc.payload,
+                createdAt: localDoc.createdAt,
+                updatedAt: localDoc.updatedAt,
+              }),
+            });
+          } catch {
+            // 補傳失敗留待下次重試
+          }
+        }
+
+        // 4. 下行整合：將雲端資料寫入本機 IndexedDB
+        for (const item of cloudDocs) {
           const { id, createdAt, updatedAt, ...payload } = item;
           if (id) {
             await sandboxDb.documents.put({
               id,
               collection: collectionName,
-              payload,
+              payload: payload as T,
               createdAt: createdAt || new Date().toISOString(),
               updatedAt: updatedAt || new Date().toISOString(),
             });
           }
         }
 
+        // 5. 重新自 IndexedDB 載入完整排序資料
         const docs = await sandboxDb.documents
           .where('collection')
           .equals(collectionName)
@@ -93,6 +129,17 @@ export function useSandboxCollection<T extends Record<string, any>>(collectionNa
     refresh().then(() => {
       void syncCloud();
     });
+
+    const handleOnline = () => {
+      void syncCloud();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+      };
+    }
   }, [refresh, syncCloud]);
 
   const insert = useCallback(
