@@ -76,7 +76,9 @@ export function VisitorPublicKioskForm({ isEmbedded = false }: { isEmbedded?: bo
         if (parsed.phone) setPhone(parsed.phone);
         if (parsed.serviceUnit) setServiceUnit(parsed.serviceUnit);
       }
-    } catch {}
+    } catch {
+      // 忽略本機快取讀取例外
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,11 +136,13 @@ export function VisitorPublicKioskForm({ isEmbedded = false }: { isEmbedded?: bo
             'LRP_LAST_VOLUNTEER',
             JSON.stringify({ name: record.name, phone: record.phone, serviceUnit: record.serviceUnit })
           );
-        } catch {}
+        } catch {
+          // 忽略本機快取寫入例外
+        }
       }
 
       setIsSubmitted(true);
-    } catch (err) {
+    } catch {
       setValidationError('儲存失敗，請重試！');
     } finally {
       setSubmitting(false);
