@@ -19,7 +19,11 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { SyncConflictsPage } from '@/pages/SyncConflictsPage';
 import { ForbiddenPage } from '@/pages/ForbiddenPage';
 import { CriticalConflictModal } from '@/components/CriticalConflictModal';
-import { AuditToolkitHub, AuditReportDispatcher } from '@/pages/audit-toolkit';
+import { AuditReportDispatcher } from '@/pages/frontline-lab/reports';
+import { KioskLayout } from '@/components/KioskLayout';
+import { FrontlineLabHub } from '@/pages/frontline-lab/FrontlineLabHub';
+import { VisitorSystemModule } from '@/pages/frontline-lab/visitor-system';
+import { VisitorPublicKioskForm } from '@/pages/frontline-lab/visitor-system/VisitorPublicKioskForm';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@lrp/shared';
@@ -75,6 +79,12 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/403" element={<ForbiddenPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* Public Kiosk Routes: 免登入、現場獨立全螢幕登記 */}
+        <Route element={<KioskLayout />}>
+          <Route path="public/visitor" element={<VisitorPublicKioskForm />} />
+        </Route>
+
         <Route
           element={
             <>
@@ -83,9 +93,11 @@ export function App() {
             </>
           }
         >
-          {/* Public / Unauthenticated accessible routes: Audit Toolkit (免登入即印即用) */}
-          <Route path="audit-toolkit" element={<AuditToolkitHub />} />
-          <Route path="audit-toolkit/:reportId" element={<AuditReportDispatcher />} />
+          {/* Public / Unauthenticated accessible routes: Frontline Lab & Toolkit (現場工具箱與實驗室) */}
+          <Route path="frontline-lab" element={<FrontlineLabHub />} />
+          <Route path="frontline-lab/visitor" element={<VisitorSystemModule />} />
+          <Route path="frontline-lab/reports/:reportId" element={<AuditReportDispatcher />} />
+          <Route path="frontline-lab/:reportId" element={<AuditReportDispatcher />} />
 
           {/* Protected routes: 需要登入驗證 */}
           <Route element={<PrivateRoute />}>

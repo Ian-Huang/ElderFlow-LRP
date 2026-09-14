@@ -24,7 +24,7 @@ export interface AuditColumnDef {
 
 /** 報表設定契約（Registry 的宣告單元） */
 export interface AuditReportConfig {
-  /** 報表唯一識別碼（對應路由 /audit-toolkit/:reportId） */
+  /** 報表唯一識別碼（對應路由 /frontline-lab/:reportId） */
   id: string;
   /** 報表顯示名稱（作為預設頁首標題） */
   title: string;

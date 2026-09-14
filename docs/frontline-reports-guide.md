@@ -1,12 +1,12 @@
-# 評鑑報表工具箱 (Audit Toolkit) 架構與開發規範手冊
+# 現場工具箱：評鑑稽核專用報表 (Frontline Compliance Reports) 開發規範手冊
 
-本文件為長照機構評鑑報表工具箱（Audit Toolkit）的**核心架構設計契約**與**工程開發準則**。未來的工程師或 AI Agent 接到「新增/修改評鑑報表」需求時，**必須嚴格遵循本文件規範**。
+本文件為長照機構「現場工具箱與實驗室（Frontline Lab / Toolkit）」中**專區 A：評鑑稽核專用報表**的核心架構設計契約與工程開發準則。未來的工程師或 AI Agent 接到「新增/修改評鑑報表」需求時，**必須嚴格遵循本文件規範**。
 
 ---
 
 ## 一、模組定位與設計目標
 
-長照機構面臨評鑑查核的高度急迫性，但完整後端系統與工作流推進需要時間。**評鑑報表工具箱**作為實用主義的過渡橋樑（Pragmatic Bridge）：
+長照機構面臨評鑑查核的高度急迫性，但完整後端系統與工作流推進需要時間。現場工具箱的**評鑑稽核專用報表子系統**作為實用主義的過渡橋樑（Pragmatic Bridge）：
 1. **純前端、高可用、無伺服器依賴**：可在離線或瀏覽器端直接運作，支援下載標準 UTF-8 CSV 範本、匯入本機歷史資料。
 2. **評鑑實體輸出優先（Print-First）**：排版完全針對真實實體 A4 列印與 PDF 輸出調校，確保格式美觀、嚴謹、無第二頁溢出或底部尷尬空白。
 3. **可擴充註冊中心架構**：新增任何報表無需重寫外殼與路由，一律透過 Registry 註冊。
@@ -54,22 +54,21 @@
 
 ## 三、系統架構與程式碼組織
 
-整個評鑑工具箱位於 `apps/web/src/pages/audit-toolkit/`：
+評鑑稽核專用報表模組位於 `apps/web/src/pages/frontline-lab/reports/`：
 
 ```
-apps/web/src/pages/audit-toolkit/
+apps/web/src/pages/frontline-lab/reports/
 ├── index.ts                     # 模組統一對外導出進入點
 ├── auditToolkitTypes.ts         # 核心介面 (AuditReportConfig, AuditReportColumn 等)
 ├── reportRegistry.ts            # 報表註冊中心 (單例 Registry Pattern)
 ├── AuditReportShell.tsx         # 報表通用外殼 (A4 紙張外框、工具列、列印觸發器)
-├── AuditToolkitHub.tsx          # 工具箱總覽入口首頁 (/audit-toolkit)
-├── AuditReportDispatcher.tsx    # 動態分發路由 (/audit-toolkit/:reportId)
+├── AuditReportDispatcher.tsx    # 動態分發路由 (/frontline-lab/:reportId 或 /frontline-lab/reports/:reportId)
 │
-├── repairsReportConfig.ts       # 模組 1：機構修繕通報紀錄表 設定檔
-├── RepairReportPrintView.tsx    # 模組 1：橫向 A4 歷史資料報表視圖
+├── repairReportConfig.ts        # 模組 1：機構修繕通報紀錄表 設定檔
+├── RepairReportPrintView.tsx    # 模組 1：橫向 A4 歷史資料報表視圖 (/frontline-lab/repairs)
 │
 ├── sanitationReportConfig.ts    # 模組 2：環境清潔消毒紀錄表 設定檔
-└── SanitationReportPrintView.tsx# 模組 2：直向 A4 一頁三旬制式打勾視圖
+└── SanitationReportPrintView.tsx# 模組 2：直向 A4 一頁三旬制式打勾視圖 (/frontline-lab/sanitation)
 ```
 
 ---

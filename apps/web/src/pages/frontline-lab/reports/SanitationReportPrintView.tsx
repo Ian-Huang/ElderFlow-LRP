@@ -144,7 +144,7 @@ export function SanitationReportPrintView({
     if (onBack) {
       onBack();
     } else if (inRouter) {
-      navigate('/audit-toolkit');
+      navigate('/frontline-lab');
     }
   }, [onBack, inRouter, navigate]);
 
@@ -343,10 +343,10 @@ export function SanitationReportPrintView({
             onClick={handleBack}
             className="btn btn-secondary text-xs flex items-center gap-1.5"
             data-testid="btn-back-to-hub"
-            aria-label="返回工具箱總覽"
+            aria-label="返回現場實驗室"
           >
             <ArrowLeftIcon className="w-3.5 h-3.5" />
-            <span>返回工具箱</span>
+            <span>返回現場實驗室</span>
           </button>
 
           <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">

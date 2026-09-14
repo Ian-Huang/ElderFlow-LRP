@@ -95,17 +95,31 @@
   3. 未來若需將歷史資料匯入新系統，此處產出的正規化資料為標準遷移來源 (Migration Source)。
   4. 詳細操作與重整流程見 `downloaded-system/README.md`。
 
-### 評鑑報表工具箱 (Audit Toolkit)
-- **定義**：為應對長照評鑑時效性與解決舊系統難用引發的「影子 IT」問題所設立的實用主義過渡專區。提供純前端無伺服器依賴的 A4 評鑑報表產製引擎，支援標準 CSV 範本下載、歷史資料批次匯入、動態表頭編輯 (contenteditable) 與高保真 A4 直向/橫向滿版列印，並具備平滑升級對接系統資料庫的能力。
-- **架構與開發指引**：詳見專案規範文件 [`docs/audit-toolkit-guide.md`](file:///Users/ian.huang/aiProjects/LRP/docs/audit-toolkit-guide.md)。
-- **關鍵模組**：`reportRegistry.ts`, `AuditReportDispatcher.tsx`, `AuditToolkitHub.tsx`, `AuditReportShell.tsx`, `SanitationReportPrintView.tsx`, `RepairReportPrintView.tsx`, `CsvParserEngine`
-- **核心業務與合規規則**：
-  1. **未來時間嚴禁預勾**：評鑑合規防呆，未來的時間絕對不可預打勾或預簽名；「一鍵打勾」與預設值僅限於今天與過去日期（`isFutureDate`）。
-  2. **擬真手寫人味打勾**：統一使用 `HandwrittenCheck` 搭配 FNV-1a 跨月動態種子（`getHandwrittenSeed`），提供 14 種手寫路徑與旋轉/縮放/位移多維度自然隨機性，嚴禁每個月同一天千篇一律。
-  3. **A4 滿版列印**：直向單頁規格 `height: 1123px; flex justify-between; margin: 4mm 6mm;`，嚴格達成一頁滿版零空白且不溢出第二頁。
-  4. **簽名欄位合併留白**：班別簽名欄日夜合併（`colspan="2"`），預設保持空白以供現場親簽，不蓋假印章。
-  5. **隱私與本機執行**：所有 CSV 解析與報表運算必須在瀏覽器本機端完成，不得洩漏個資。
-  6. **擴充模式**：新增任何報表必須透過 `reportRegistry` 註冊，自動連動 Hub 首頁與動態分發路由。
+### 現場工具箱與實驗室 (Frontline Lab / Toolkit)
+- **定義**：為長照機構第一線跨職類現場人員（包含護理師、照服員、社工、復健治療師、行政總務、機構主任等領域專家）開闢的自主研發與快速驗證專區（`apps/web/src/pages/frontline-lab/`）。現場人員與 AI 搭檔開發時，享有 Google 試算表般的無綱要（Schema-less）資料存取自由，同時保有系統離線存取與三合一驗證閉環，並具備未來平滑升格為核心業務的能力。
+- **架構與開發指引**：
+  - 總綱規範：[`docs/frontline-lab-guide.md`](file:///Users/ian.huang/aiProjects/LRP/docs/frontline-lab-guide.md)
+  - 現場人員白話手冊：[`docs/frontline-ai-playbook.md`](file:///Users/ian.huang/aiProjects/LRP/docs/frontline-ai-playbook.md)
+  - 評鑑報表開發手冊：[`docs/frontline-reports-guide.md`](file:///Users/ian.huang/aiProjects/LRP/docs/frontline-reports-guide.md)
+- **兩大業務專區**：
+  1. **專區 A：評鑑稽核專用報表 (Audit Reports，位於 `reports/`)**：
+     - 提供純前端無伺服器依賴的 A4 評鑑報表產製引擎，支援標準 CSV 範本下載、歷史資料批次匯入、動態表頭編輯 (contenteditable) 與高保真 A4 直向/橫向滿版列印。
+     - **關鍵模組**：`reportRegistry.ts`, `AuditReportDispatcher.tsx`, `AuditReportShell.tsx`, `SanitationReportPrintView.tsx`, `RepairReportPrintView.tsx`, `CsvParserEngine`。
+     - 包含機構修繕通報紀錄表 (`/frontline-lab/repairs`)、環境清潔消毒自主檢查表 (`/frontline-lab/sanitation`)。
+  2. **專區 B：現場自製登記工具 (Frontline Operations)**：
+     - 訪客與志工線上登記（三件套：`/frontline-lab/visitor`、`/public/visitor`）、品質指標每日登記、感管耗材庫存盤點等。
+- **沙盒三合一架構 (3-in-1 Triad)**：
+  1. **公開填寫端 (Kiosk Form)**：訪客或現場免登入填寫，單純寫入，不洩漏他人資料（`/public/:slug`）。
+  2. **內部資料庫管理 (Data Manager)**：登入後可即時檢視、修改、補登與刪除測試資料（`useSandboxCollection`）。
+  3. **評鑑 A4 報表 (Audit Print)**：撈取動態資料渲染高保真 A4 報表（遵循 `AuditReportShell` 規範）。
+- **動態集合儲存 (Dynamic Collection)**：
+  - 本機以 IndexedDB (Dexie) 優先儲存，離線或無雲端後端時即可 100% 運作。
+  - 雲端以 Cloudflare D1 `sandbox_documents` 表承接任意 JSON 結構，無需 SQL migration。
+- **黃金業務防呆法則**：
+  - 手機開頭 `0` 與床號（如 `2-3`）強制純字串存儲，防型別自動轉換。
+  - 評鑑紀錄未發生未來日期嚴禁預打勾。
+  - 列印時所有網頁外殼與按鈕強制 `no-print` 隱藏，防擠壓跨頁。
+
 
 ## 實體關係
 

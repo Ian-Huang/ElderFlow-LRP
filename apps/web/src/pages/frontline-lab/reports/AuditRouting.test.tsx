@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { reportRegistry } from './reportRegistry';
 import { AuditReportDispatcher } from './AuditReportDispatcher';
 
-describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routing & Permissions)', () => {
+describe('現場實驗室與工具箱系統導覽、路由與權限整合測試 (Frontline Lab & Routing)', () => {
   beforeEach(() => {
     reportRegistry.reset();
     useAuthStore.setState({
@@ -21,7 +21,7 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     });
   });
 
-  it('主導覽元件 Layout 包含「評鑑工具箱」專區導覽連結，並配置 BriefcaseIcon', () => {
+  it('主導覽元件 Layout 僅保留單一「現場實驗室」專區導覽連結（移除重複之評鑑工具箱），並配置 BeakerIcon', () => {
     // 設定已登入之照護員角色
     useAuthStore.setState({
       user: {
@@ -43,13 +43,16 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
       </MemoryRouter>,
     );
 
-    // 驗證主要導覽列包含「評鑑工具箱」
-    const navLinks = screen.getAllByRole('link', { name: /評鑑工具箱/ });
+    // 驗證主要導覽列包含「現場實驗室」，且路徑為 /frontline-lab
+    const navLinks = screen.getAllByRole('link', { name: /現場實驗室/ });
     expect(navLinks.length).toBeGreaterThan(0);
-    expect(navLinks[0]).toHaveAttribute('href', '/audit-toolkit');
+    expect(navLinks[0]).toHaveAttribute('href', '/frontline-lab');
+
+    // 驗證重複之「評鑑工具箱」已自側邊導覽列移除，避免現場人員困惑
+    expect(screen.queryByRole('link', { name: /^評鑑工具箱$/ })).not.toBeInTheDocument();
   });
 
-  it('全角色存取無礙：照護員 (Caregiver) 無需督導/管理員權限即可無縫造訪 /audit-toolkit', () => {
+  it('全角色存取無礙：照護員 (Caregiver) 無需督導/管理員權限即可無縫造訪 /frontline-lab', () => {
     useAuthStore.setState({
       user: {
         userId: 'cg-2',
@@ -65,17 +68,17 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     });
 
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit']}>
+      <MemoryRouter initialEntries={['/frontline-lab']}>
         <App />
       </MemoryRouter>,
     );
 
-    // 正常進入工具箱首頁，無 403 阻擋或跳轉
-    expect(screen.getByRole('heading', { level: 1, name: /評鑑報表工具箱/ })).toBeInTheDocument();
+    // 正常進入現場實驗室首頁，無 403 阻擋或跳轉
+    expect(screen.getByRole('heading', { level: 1, name: /現場工具箱與實驗室/ })).toBeInTheDocument();
     expect(screen.getByTestId('toolkit-card-repairs')).toBeInTheDocument();
   });
 
-  it('免登入訪客模式 (Guest)：未登入狀態下造訪 /audit-toolkit 不被重導向至 /login，可即開即用', () => {
+  it('免登入訪客模式 (Guest)：未登入狀態下造訪 /frontline-lab 不被重導向至 /login，可即開即用', () => {
     useAuthStore.setState({
       user: null,
       isAuthenticated: false,
@@ -84,17 +87,18 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     });
 
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit']}>
+      <MemoryRouter initialEntries={['/frontline-lab']}>
         <App />
       </MemoryRouter>,
     );
 
-    // 驗證未授權/未登入下仍能完整看到工具箱總覽
-    expect(screen.getByRole('heading', { level: 1, name: /評鑑報表工具箱/ })).toBeInTheDocument();
+    // 驗證未授權/未登入下仍能完整看到現場工具箱與實驗室總覽
+    expect(screen.getByRole('heading', { level: 1, name: /現場工具箱與實驗室/ })).toBeInTheDocument();
     expect(screen.getByTestId('toolkit-card-repairs')).toBeInTheDocument();
   });
 
-  it('免登入狀態下可直接造訪 /audit-toolkit/repairs，執行 A4 報表檢視與列印', () => {
+
+  it('免登入狀態下可直接造訪 /frontline-lab/repairs，執行 A4 報表檢視與列印', () => {
     useAuthStore.setState({
       user: null,
       isAuthenticated: false,
@@ -103,7 +107,7 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     });
 
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit/repairs']}>
+      <MemoryRouter initialEntries={['/frontline-lab/repairs']}>
         <App />
       </MemoryRouter>,
     );
@@ -114,7 +118,7 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     expect(screen.getByRole('button', { name: /立即列印/ })).toBeInTheDocument();
   });
 
-  it('免登入狀態下可直接造訪 /audit-toolkit/sanitation，執行環境清潔消毒記錄表檢視與列印', () => {
+  it('免登入狀態下可直接造訪 /frontline-lab/sanitation，執行環境清潔消毒記錄表檢視與列印', () => {
     useAuthStore.setState({
       user: null,
       isAuthenticated: false,
@@ -123,7 +127,7 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     });
 
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit/sanitation']}>
+      <MemoryRouter initialEntries={['/frontline-lab/sanitation']}>
         <App />
       </MemoryRouter>,
     );
@@ -135,22 +139,22 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     expect(screen.getByRole('button', { name: /立即列印/ })).toBeInTheDocument();
   });
 
-  it('點擊「返回工具箱」按鈕能順暢導航回 /audit-toolkit 總覽頁面', async () => {
+  it('點擊「返回現場實驗室」按鈕能順暢導航回 /frontline-lab 總覽頁面', async () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit/repairs']}>
+      <MemoryRouter initialEntries={['/frontline-lab/repairs']}>
         <Routes>
-          <Route path="/audit-toolkit" element={<div data-testid="hub-mock-target">工具箱總覽首頁</div>} />
-          <Route path="/audit-toolkit/:reportId" element={<AuditReportDispatcher />} />
+          <Route path="/frontline-lab" element={<div data-testid="hub-mock-target">現場實驗室總覽首頁</div>} />
+          <Route path="/frontline-lab/:reportId" element={<AuditReportDispatcher />} />
         </Routes>
       </MemoryRouter>,
     );
 
-    // 驗證返回工具箱按鈕存在
+    // 驗證返回按鈕存在且指向 /frontline-lab
     const backBtn = screen.getByTestId('btn-back-to-hub');
     expect(backBtn).toBeInTheDocument();
-    expect(backBtn).toHaveAttribute('href', '/audit-toolkit');
+    expect(backBtn).toHaveAttribute('href', '/frontline-lab');
 
     // 點擊返回
     await user.click(backBtn);
@@ -159,11 +163,11 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     expect(screen.getByTestId('hub-mock-target')).toBeInTheDocument();
   });
 
-  it('造訪即將推出之報表 /audit-toolkit/visitors 呈現籌備中預告與返回總覽按鈕', () => {
+  it('造訪即將推出之報表 /frontline-lab/visitors 呈現籌備中預告與返回總覽按鈕', () => {
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit/visitors']}>
+      <MemoryRouter initialEntries={['/frontline-lab/visitors']}>
         <Routes>
-          <Route path="/audit-toolkit/:reportId" element={<AuditReportDispatcher />} />
+          <Route path="/frontline-lab/:reportId" element={<AuditReportDispatcher />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -173,11 +177,11 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
     expect(screen.getByTestId('btn-back-from-coming-soon')).toBeInTheDocument();
   });
 
-  it('造訪無效之報表代碼 /audit-toolkit/invalid-id 正確展示 404 狀態與返回按鈕', () => {
+  it('造訪無效之報表代碼 /frontline-lab/invalid-id 正確展示 404 狀態與返回按鈕', () => {
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit/non-existent-report']}>
+      <MemoryRouter initialEntries={['/frontline-lab/non-existent-report']}>
         <Routes>
-          <Route path="/audit-toolkit/:reportId" element={<AuditReportDispatcher />} />
+          <Route path="/frontline-lab/:reportId" element={<AuditReportDispatcher />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -195,7 +199,7 @@ describe('評鑑工具箱系統導覽、路由與權限整合測試 (Audit Routi
 
     try {
       render(
-        <MemoryRouter initialEntries={['/audit-toolkit/repairs']}>
+        <MemoryRouter initialEntries={['/frontline-lab/repairs']}>
           <App />
         </MemoryRouter>,
       );

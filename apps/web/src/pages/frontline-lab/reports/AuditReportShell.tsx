@@ -18,7 +18,7 @@ export interface AuditReportShellProps {
   onImport: (rows: Record<string, string>[]) => void;
   /** 額外工具列操作元件（例如：模擬新增一筆資料按鈕） */
   extraActions?: React.ReactNode;
-  /** 返回按鈕目標連結（預設 '/audit-toolkit'，設為 null 隱藏） */
+  /** 返回按鈕目標連結（預設 '/frontline-lab'，設為 null 隱藏） */
   backUrl?: string | null;
   /** 返回按鈕點擊事件（可選，如 SPA 路由導向） */
   onBack?: () => void;
@@ -46,7 +46,7 @@ export function AuditReportShell({
   rows,
   onImport,
   extraActions,
-  backUrl = '/audit-toolkit',
+  backUrl = '/frontline-lab',
   onBack,
 }: AuditReportShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -147,10 +147,10 @@ export function AuditReportShell({
               }}
               className="btn btn-secondary text-xs flex items-center gap-1.5"
               data-testid="btn-back-to-hub"
-              aria-label="返回工具箱總覽"
+              aria-label="返回現場實驗室"
             >
               <ArrowLeftIcon className="w-3.5 h-3.5" />
-              <span>返回工具箱</span>
+              <span>返回現場實驗室</span>
             </a>
           )}
           <span className="text-sm font-medium text-gray-700">

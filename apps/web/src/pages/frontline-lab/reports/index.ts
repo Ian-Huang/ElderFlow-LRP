@@ -30,8 +30,7 @@ export { RepairReportPrintView, RepairReportPage } from './RepairReportPrintView
 export { SanitationReportPrintView, SanitationReportPage, HandwrittenCheck } from './SanitationReportPrintView';
 export type { RepairRecord } from './repairReportConfig';
 
-// Toolkit Hub & Dispatcher
-export { AuditToolkitHub } from './AuditToolkitHub';
+// Toolkit Dispatcher
 export { AuditReportDispatcher } from './AuditReportDispatcher';
 
 // Icons

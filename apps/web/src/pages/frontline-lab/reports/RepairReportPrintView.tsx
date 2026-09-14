@@ -10,6 +10,7 @@ function InnerRepairShell(props: {
   rows: Record<string, string>[];
   onImport: (rows: Record<string, string>[]) => void;
   extraActions: React.ReactNode;
+  onBack?: () => void;
 }) {
   const inRouter = useInRouterContext();
   if (inRouter) {
@@ -23,9 +24,10 @@ function InnerRepairShellWithRouter(props: {
   rows: Record<string, string>[];
   onImport: (rows: Record<string, string>[]) => void;
   extraActions: React.ReactNode;
+  onBack?: () => void;
 }) {
   const navigate = useNavigate();
-  return <AuditReportShell {...props} onBack={() => navigate('/audit-toolkit')} />;
+  return <AuditReportShell {...props} onBack={props.onBack ?? (() => navigate('/frontline-lab'))} />;
 }
 
 /**
@@ -39,7 +41,7 @@ function InnerRepairShellWithRouter(props: {
  * - 支援 CSV 範本下載與即時匯入替換
  * - 支援機構全銜與報表標題直接編輯
  */
-export function RepairReportPrintView() {
+export function RepairReportPrintView({ onBack }: { onBack?: () => void } = {}) {
   const config = reportRegistry.get('repairs') ?? repairReportConfig;
   const [rows, setRows] = useState<Record<string, string>[]>(config.sampleData);
   const [poolIndex, setPoolIndex] = useState(0);
@@ -76,6 +78,7 @@ export function RepairReportPrintView() {
         rows={rows}
         onImport={handleImport}
         extraActions={extraActions}
+        onBack={onBack}
       />
     </div>
   );

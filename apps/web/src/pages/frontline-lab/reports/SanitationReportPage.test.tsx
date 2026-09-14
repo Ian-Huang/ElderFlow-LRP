@@ -272,11 +272,11 @@ describe('SanitationReportPrintView 元件渲染與互動 (F-環安-004 滿版�
     expect(within(futureCell).queryByRole('img', { name: '手寫勾選' })).not.toBeInTheDocument();
   });
 
-  it('動態路由器 AuditReportDispatcher 能正確分發 /audit-toolkit/sanitation', () => {
+  it('動態路由器 AuditReportDispatcher 能正確分發 /frontline-lab/sanitation', () => {
     render(
-      <MemoryRouter initialEntries={['/audit-toolkit/sanitation']}>
+      <MemoryRouter initialEntries={['/frontline-lab/sanitation']}>
         <Routes>
-          <Route path="/audit-toolkit/:reportId" element={<AuditReportDispatcher />} />
+          <Route path="/frontline-lab/:reportId" element={<AuditReportDispatcher />} />
         </Routes>
       </MemoryRouter>,
     );

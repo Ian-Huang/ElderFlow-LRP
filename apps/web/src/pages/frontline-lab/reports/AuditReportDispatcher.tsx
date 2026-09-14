@@ -17,18 +17,18 @@ import type { AuditReportConfig } from './auditToolkitTypes';
  * - 若為即將推出 (coming-soon) 模組，顯示籌備中預告與返回按鈕
  * - 若查無此報表，顯示友善 404 狀態與返回按鈕
  */
-export function AuditReportDispatcher() {
+export function AuditReportDispatcher({ backUrl = '/frontline-lab' }: { backUrl?: string } = {}) {
   const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
 
   // 若為修繕報表，使用專用 PrintView
   if (reportId === 'repairs') {
-    return <RepairReportPrintView />;
+    return <RepairReportPrintView onBack={() => navigate(backUrl)} />;
   }
 
   // 若為環境清潔消毒記錄表，使用專用 PrintView
   if (reportId === 'sanitation') {
-    return <SanitationReportPrintView />;
+    return <SanitationReportPrintView onBack={() => navigate(backUrl)} />;
   }
 
   const config: AuditReportConfig | undefined = reportId ? reportRegistry.get(reportId) : undefined;
@@ -44,15 +44,15 @@ export function AuditReportDispatcher() {
         </div>
         <h2 className="text-xl font-bold text-gray-900 mb-2">找不到指定的評鑑報表</h2>
         <p className="text-sm text-gray-600 mb-6">
-          系統中未找到代號為「<code className="text-danger-600 font-mono">{reportId}</code>」的報表設定。請檢查網址或點擊下方按鈕返回工具箱總覽。
+          系統中未找到代號為「<code className="text-danger-600 font-mono">{reportId}</code>」的報表設定。請檢查網址或點擊下方按鈕返回現場實驗室總覽。
         </p>
         <Link
-          to="/audit-toolkit"
+          to={backUrl}
           className="btn btn-primary inline-flex items-center gap-2 text-sm"
           data-testid="btn-back-from-404"
         >
           <ArrowLeftIcon className="w-4 h-4" />
-          <span>返回工具箱總覽</span>
+          <span>返回現場實驗室</span>
         </Link>
       </div>
     );
@@ -89,12 +89,12 @@ export function AuditReportDispatcher() {
           </div>
 
           <Link
-            to="/audit-toolkit"
+            to={backUrl}
             className="btn btn-primary inline-flex items-center gap-2 text-sm"
             data-testid="btn-back-from-coming-soon"
           >
             <ArrowLeftIcon className="w-4 h-4" />
-            <span>返回工具箱總覽</span>
+            <span>返回現場實驗室</span>
           </Link>
         </div>
       </div>
@@ -102,7 +102,7 @@ export function AuditReportDispatcher() {
   }
 
   // 通用動態報表外殼渲染
-  return <GenericAuditReportView config={config} onBack={() => navigate('/audit-toolkit')} />;
+  return <GenericAuditReportView config={config} onBack={() => navigate(backUrl)} />;
 }
 
 /** 通用已註冊報表渲染外殼 */
