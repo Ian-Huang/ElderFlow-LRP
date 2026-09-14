@@ -46,9 +46,54 @@ export function useSandboxCollection<T extends Record<string, any>>(collectionNa
     }
   }, [collectionName]);
 
+  // 嘗試與雲端 Cloudflare D1 (/api/sandbox/:collection) 背景雙向同步
+  const syncCloud = useCallback(async () => {
+    if (typeof window === 'undefined' || !navigator.onLine) return;
+
+    try {
+      const res = await fetch(`/api/sandbox/${encodeURIComponent(collectionName)}`);
+      if (!res.ok) return;
+
+      const body = await res.json();
+      if (body?.success && Array.isArray(body.data)) {
+        for (const item of body.data) {
+          const { id, createdAt, updatedAt, ...payload } = item;
+          if (id) {
+            await sandboxDb.documents.put({
+              id,
+              collection: collectionName,
+              payload,
+              createdAt: createdAt || new Date().toISOString(),
+              updatedAt: updatedAt || new Date().toISOString(),
+            });
+          }
+        }
+
+        const docs = await sandboxDb.documents
+          .where('collection')
+          .equals(collectionName)
+          .reverse()
+          .sortBy('createdAt');
+
+        const mergedItems: SandboxItem<T>[] = docs.map((doc) => ({
+          id: doc.id,
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt,
+          ...(doc.payload as T),
+        }));
+
+        setData(mergedItems);
+      }
+    } catch {
+      // 離線或無雲端後端時靜默安全忽略
+    }
+  }, [collectionName]);
+
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    refresh().then(() => {
+      void syncCloud();
+    });
+  }, [refresh, syncCloud]);
 
   const insert = useCallback(
     async (payload: T): Promise<string> => {
@@ -64,6 +109,16 @@ export function useSandboxCollection<T extends Record<string, any>>(collectionNa
 
       await sandboxDb.documents.put(doc);
       await refresh();
+
+      // 背景同步至雲端 D1
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        fetch(`/api/sandbox/${encodeURIComponent(collectionName)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, payload, createdAt: now, updatedAt: now }),
+        }).catch(() => {});
+      }
+
       return id;
     },
     [collectionName, refresh]
@@ -88,16 +143,32 @@ export function useSandboxCollection<T extends Record<string, any>>(collectionNa
 
       await sandboxDb.documents.put(updatedDoc);
       await refresh();
+
+      // 背景同步至雲端 D1
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        fetch(`/api/sandbox/${encodeURIComponent(collectionName)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, payload: updatedDoc.payload, updatedAt: now }),
+        }).catch(() => {});
+      }
     },
-    [refresh]
+    [collectionName, refresh]
   );
 
   const remove = useCallback(
     async (id: string): Promise<void> => {
       await sandboxDb.documents.delete(id);
       await refresh();
+
+      // 背景自雲端 D1 刪除
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        fetch(`/api/sandbox/${encodeURIComponent(collectionName)}?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
     },
-    [refresh]
+    [collectionName, refresh]
   );
 
   const exportCSV = useCallback(
