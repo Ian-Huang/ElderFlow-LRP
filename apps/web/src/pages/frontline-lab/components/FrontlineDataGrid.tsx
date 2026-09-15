@@ -32,6 +32,60 @@ export interface FrontlineDataGridProps<T extends Record<string, any>> {
   extraActions?: React.ReactNode;
 }
 
+const DEFAULT_COLUMN_ALIASES: Record<string, string[]> = {
+  name: ['姓名', '訪客姓名', '志工姓名', '代表姓名', '名字', '聯絡人', 'name'],
+  phone: ['電話', '聯絡電話', '手機', '行動電話', '聯絡方式', 'phone', 'tel'],
+  temperature: ['體溫', '溫度', '耳溫', '額溫', 'temp', 'temperature'],
+  visitDate: ['日期', '登記日期', '探視日期', '來訪日期', '服務日期', 'date'],
+  visitTime: ['時間', '登記時間', '來訪時間', '進入時間', 'time'],
+  visitorType: ['身分', '身分類別', '類別', '訪客身分', '身分/類別', 'type'],
+  residentName: ['長輩', '長輩姓名', '住民', '住民姓名', '探視長輩', '探視長者', '長者', '個案'],
+  residentBed: ['床號', '房號', '床位', '房床號', '床', 'bed'],
+  relationship: ['關係', '家屬關係', '親屬關係', '稱謂', '與長輩關係'],
+  isRegisteredFamily: ['登記家屬', '是否為登記家屬', '簽署家屬', '法定家屬'],
+  serviceUnit: ['志工單位', '服務單位', '所屬單位', '團契', '機構', '團體名稱', '單位'],
+  servicePurpose: ['服務事由', '志工目的', '服務內容', '事由', '服務項目'],
+  organization: ['洽公單位', '公司', '廠商', '洽公機構', '來訪單位'],
+  officialPurpose: ['洽工事由', '公務事由', '來訪目的', '洽談事項'],
+  tocc: ['tocc', '旅遊史', '接觸史', '防疫史', '群聚史'],
+  healthMeasures: ['健康管理', '防疫措施', '管理措施', '佩戴口罩', '洗手清消'],
+  notes: ['備註', '說明', '補充', '備註說明', '備查事項'],
+  estimatedDuration: ['停留時間', '預計停留', '停留時間(小時)', '時間長度'],
+  estimatedLeaveTime: ['離開時間', '預計離開時間', '離院時間'],
+  companionNames: ['同行人員', '同行名冊', '同行夥伴', '同行名單'],
+};
+
+function findBestColumnMatch<T>(cellText: string, columns: DataGridColumn<T>[]): string | undefined {
+  if (!cellText) return undefined;
+  const clean = cellText.trim().toLowerCase();
+
+  // 1. Exact label or key match
+  const exact = columns.find(
+    (c) => c.label.toLowerCase() === clean || c.key.toLowerCase() === clean
+  );
+  if (exact) return exact.key;
+
+  // 2. Alias match from dictionary
+  for (const col of columns) {
+    const aliases = DEFAULT_COLUMN_ALIASES[col.key] || [];
+    if (
+      aliases.some(
+        (a) => clean === a.toLowerCase() || clean.includes(a.toLowerCase()) || a.toLowerCase().includes(clean)
+      )
+    ) {
+      return col.key;
+    }
+  }
+
+  // 3. Partial inclusion match on label
+  const partial = columns.find(
+    (c) => c.label.toLowerCase().includes(clean) || clean.includes(c.label.toLowerCase())
+  );
+  if (partial) return partial.key;
+
+  return undefined;
+}
+
 export function FrontlineDataGrid<T extends Record<string, any>>({
   title,
   data,
@@ -69,6 +123,8 @@ export function FrontlineDataGrid<T extends Record<string, any>>({
   // 5. 貼上匯入 Modal 狀態
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteRawText, setPasteRawText] = useState('');
+  const [hasHeaderRow, setHasHeaderRow] = useState(true);
+  const [columnMappings, setColumnMappings] = useState<Record<number, string>>({});
   const [isImporting, setIsImporting] = useState(false);
 
   // Focus input when inline editing starts
@@ -154,50 +210,70 @@ export function FrontlineDataGrid<T extends Record<string, any>>({
     setEditingCell(null);
   };
 
-  // Google Sheet / Excel 貼上解析器
-  const parsedPasteRecords = useMemo(() => {
+  // Google Sheet / Excel 貼上解析器：原始矩陣與欄位計算
+  const rawMatrix = useMemo(() => {
     if (!pasteRawText.trim()) return [];
     const lines = pasteRawText.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (lines.length === 0) return [];
+    return lines.map((line) => line.split('\t').map((c) => c.trim()));
+  }, [pasteRawText]);
 
-    const matrix = lines.map((line) => line.split('\t').map((c) => c.trim()));
-    if (matrix.length === 0) return [];
+  const maxPastedCols = useMemo(() => {
+    return Math.max(...rawMatrix.map((r) => r.length), 0);
+  }, [rawMatrix]);
 
-    // 檢查第 1 列是否為表頭
-    const firstRow = matrix[0] || [];
-    const matchedIndices: { [colIndex: number]: string } = {};
+  // 當貼上內容變動時，自動智慧偵測是否有表頭，並建立初步的欄位映射
+  useEffect(() => {
+    if (rawMatrix.length === 0) {
+      setColumnMappings({});
+      return;
+    }
+
+    const firstRow = rawMatrix[0] || [];
+    const detectedMappings: Record<number, string> = {};
+    let matchedCount = 0;
 
     firstRow.forEach((cellText, idx) => {
-      const matchedCol = columns.find(
-        (c) =>
-          c.label.toLowerCase() === cellText.toLowerCase() ||
-          c.key.toLowerCase() === cellText.toLowerCase() ||
-          cellText.includes(c.label)
-      );
-      if (matchedCol) {
-        matchedIndices[idx] = matchedCol.key;
+      const matchedKey = findBestColumnMatch(cellText, columns);
+      if (matchedKey) {
+        detectedMappings[idx] = matchedKey;
+        matchedCount++;
       }
     });
 
-    const isHeaderRowPresent = Object.keys(matchedIndices).length >= 2;
-    const dataRows = isHeaderRowPresent ? matrix.slice(1) : matrix;
+    const isHeaderLikely = matchedCount >= 1;
+    setHasHeaderRow(isHeaderLikely);
+
+    if (isHeaderLikely) {
+      setColumnMappings(detectedMappings);
+    } else {
+      const fallbackMappings: Record<number, string> = {};
+      firstRow.forEach((_, idx) => {
+        fallbackMappings[idx] = columns[idx]?.key || '';
+      });
+      setColumnMappings(fallbackMappings);
+    }
+  }, [rawMatrix, columns]);
+
+  const parsedPasteRecords = useMemo(() => {
+    if (rawMatrix.length === 0) return [];
+    const dataRows = hasHeaderRow ? rawMatrix.slice(1) : rawMatrix;
 
     return dataRows.map((row) => {
       const record: Record<string, any> = {};
       row.forEach((val, colIdx) => {
-        const key = isHeaderRowPresent ? matchedIndices[colIdx] : columns[colIdx]?.key;
-        if (key) {
-          const colDef = columns.find((c) => c.key === key);
+        const targetKey = columnMappings[colIdx];
+        if (targetKey) {
+          const colDef = columns.find((c) => c.key === targetKey);
           if (colDef?.type === 'number' && !isNaN(Number(val)) && val.trim() !== '') {
-            record[key] = Number(val);
+            record[targetKey] = Number(val);
           } else {
-            record[key] = val;
+            record[targetKey] = val;
           }
         }
       });
       return record as T;
     });
-  }, [pasteRawText, columns]);
+  }, [rawMatrix, hasHeaderRow, columnMappings, columns]);
 
   const handleConfirmImport = async () => {
     if (!onPasteImport || parsedPasteRecords.length === 0) return;
@@ -479,8 +555,8 @@ export function FrontlineDataGrid<T extends Record<string, any>>({
 
       {/* Google Sheet / Excel 貼上匯入彈出視窗 */}
       {showPasteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 border border-slate-200 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6 border border-slate-200 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-800 flex items-center">
@@ -502,36 +578,106 @@ export function FrontlineDataGrid<T extends Record<string, any>>({
               <textarea
                 value={pasteRawText}
                 onChange={(e) => setPasteRawText(e.target.value)}
-                placeholder="請在此按 Ctrl+V (或 Cmd+V) 貼上複製的表格內容...&#10;系統會自動辨識欄位（即使包含表頭也能自動對齊）"
-                className="w-full h-36 p-3 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none"
+                placeholder="請在此按 Ctrl+V (或 Cmd+V) 貼上複製的表格內容...&#10;系統會自動辨識欄位（即使順序不同或包含表頭也能自動對齊）"
+                className="w-full h-24 p-3 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none"
               />
 
-              {/* 即時解析預覽 */}
-              {parsedPasteRecords.length > 0 && (
-                <div className="border border-emerald-200 bg-emerald-50/50 rounded-xl p-3 space-y-2 flex-1 overflow-hidden flex flex-col">
-                  <div className="flex items-center justify-between text-xs font-bold text-emerald-800">
-                    <span>✅ 已辨識出 {parsedPasteRecords.length} 筆資料</span>
-                    <span className="text-emerald-600 text-[11px]">前 3 筆即時預覽</span>
+              {/* 即時解析與自訂欄位對應 */}
+              {rawMatrix.length > 0 && (
+                <div className="border border-emerald-200 bg-emerald-50/40 rounded-xl p-3 space-y-3 flex-1 overflow-hidden flex flex-col">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                    <div className="flex items-center space-x-3">
+                      <span className="font-bold text-emerald-800">
+                        ✅ 已辨識出 {parsedPasteRecords.length} 筆資料
+                      </span>
+                      <label className="inline-flex items-center space-x-1.5 cursor-pointer font-medium text-slate-700 select-none bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={hasHeaderRow}
+                          onChange={(e) => setHasHeaderRow(e.target.checked)}
+                          className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <span>第一列為標題列 (表頭)</span>
+                      </label>
+                    </div>
+                    <span className="text-slate-500 text-[11px]">
+                      💡 每欄上方可手動下拉更換對應欄位，順序不拘，亦可略過
+                    </span>
                   </div>
-                  <div className="overflow-x-auto overflow-y-auto max-h-36 bg-white rounded-lg border border-emerald-100">
-                    <table className="min-w-full text-[11px] divide-y divide-slate-100">
-                      <thead className="bg-slate-50 text-slate-600 font-semibold">
+
+                  {/* 視覺化欄位對應與預覽表格 */}
+                  <div className="overflow-x-auto overflow-y-auto max-h-52 bg-white rounded-xl border border-emerald-200 shadow-sm">
+                    <table className="min-w-full text-xs divide-y divide-slate-200">
+                      <thead className="bg-slate-50 sticky top-0 z-10">
                         <tr>
-                          {Object.keys(parsedPasteRecords[0] || {}).map((k) => (
-                            <th key={k} className="px-2 py-1 text-left whitespace-nowrap">
-                              {columns.find((c) => c.key === k)?.label || k}
-                            </th>
-                          ))}
+                          {Array.from({ length: maxPastedCols }, (_, colIdx) => {
+                            const currentTarget = columnMappings[colIdx] || '';
+                            const headerSample = hasHeaderRow ? rawMatrix[0]?.[colIdx] : '';
+                            return (
+                              <th
+                                key={colIdx}
+                                className={`p-2.5 border-r border-slate-200 text-left min-w-[150px] ${
+                                  currentTarget ? 'bg-emerald-50/80' : 'bg-slate-100/60'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-1.5 text-[11px]">
+                                  <span className="font-bold text-slate-600">
+                                    第 {colIdx + 1} 欄
+                                  </span>
+                                  {headerSample && (
+                                    <span
+                                      className="text-[10px] bg-white border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[85px]"
+                                      title={headerSample}
+                                    >
+                                      {headerSample}
+                                    </span>
+                                  )}
+                                </div>
+                                <select
+                                  value={currentTarget}
+                                  onChange={(e) =>
+                                    setColumnMappings((prev) => ({
+                                      ...prev,
+                                      [colIdx]: e.target.value,
+                                    }))
+                                  }
+                                  className={`w-full px-2 py-1 text-xs rounded-lg border font-sans focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors ${
+                                    currentTarget
+                                      ? 'border-emerald-500 bg-white text-emerald-900 font-semibold shadow-xs'
+                                      : 'border-slate-300 bg-white text-slate-400'
+                                  }`}
+                                >
+                                  <option value="">⛔ 略過此欄 (不匯入)</option>
+                                  {columns.map((c) => (
+                                    <option key={c.key} value={c.key}>
+                                      ➔ {c.label} ({c.key})
+                                    </option>
+                                  ))}
+                                </select>
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {parsedPasteRecords.slice(0, 3).map((r, i) => (
-                          <tr key={i}>
-                            {Object.keys(parsedPasteRecords[0] || {}).map((k) => (
-                              <td key={k} className="px-2 py-1 whitespace-nowrap text-slate-700">
-                                {String((r as any)[k] ?? '—')}
-                              </td>
-                            ))}
+                        {(hasHeaderRow ? rawMatrix.slice(1) : rawMatrix).slice(0, 3).map((row, rIdx) => (
+                          <tr key={rIdx} className="hover:bg-slate-50/60 transition-colors">
+                            {Array.from({ length: maxPastedCols }, (_, colIdx) => {
+                              const val = row[colIdx] || '';
+                              const isMapped = Boolean(columnMappings[colIdx]);
+                              return (
+                                <td
+                                  key={colIdx}
+                                  className={`p-2 border-r border-slate-100 whitespace-nowrap text-xs font-mono ${
+                                    isMapped
+                                      ? 'text-slate-800 bg-white'
+                                      : 'text-slate-400 bg-slate-50/50 line-through opacity-60'
+                                  }`}
+                                >
+                                  {val || '—'}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
@@ -541,23 +687,36 @@ export function FrontlineDataGrid<T extends Record<string, any>>({
               )}
             </div>
 
-            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowPasteModal(false)}
-                className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                disabled={isImporting}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmImport}
-                disabled={parsedPasteRecords.length === 0 || isImporting}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center"
-              >
-                {isImporting ? '匯入中...' : `確認匯入 ${parsedPasteRecords.length} 筆資料`}
-              </button>
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <span className="text-xs text-slate-500">
+                {rawMatrix.length > 0 && (
+                  <span>
+                    已對應{' '}
+                    <strong className="text-emerald-700">
+                      {Object.values(columnMappings).filter(Boolean).length}
+                    </strong>{' '}
+                    / {maxPastedCols} 欄位
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPasteModal(false)}
+                  className="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  disabled={isImporting}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={parsedPasteRecords.length === 0 || isImporting}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center"
+                >
+                  {isImporting ? '匯入中...' : `確認匯入 ${parsedPasteRecords.length} 筆資料`}
+                </button>
+              </div>
             </div>
           </div>
         </div>

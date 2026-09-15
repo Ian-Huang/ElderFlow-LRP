@@ -157,4 +157,53 @@ describe('FrontlineDataGrid (現場低代碼通用試算表元件)', () => {
       ]);
     });
   });
+
+  it('支援欄位順序不同與手動調整下拉選單映射（即使無表頭或有不需要的欄位亦可略過）', async () => {
+    const handlePasteImport = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+    render(
+      <FrontlineDataGrid<MockItem>
+        data={mockData}
+        columns={mockColumns}
+        onPasteImport={handlePasteImport}
+      />
+    );
+
+    // 打開匯入視窗
+    fireEvent.click(screen.getByText(/貼上匯入/));
+
+    // 貼上無表頭資料：第 1 欄為分數，第 2 欄為垃圾欄位，第 3 欄為姓名
+    const textarea = screen.getByPlaceholderText(/請在此按 Ctrl\+V/);
+    const customTsv = `98\t內部備忘\t陳專員\n77\t備註文字\t林組長`;
+    fireEvent.change(textarea, { target: { value: customTsv } });
+
+    // 關閉表頭開關 (因為是純資料無表頭)
+    const headerCheckbox = screen.getByLabelText(/第一列為標題列/);
+    if ((headerCheckbox as HTMLInputElement).checked) {
+      fireEvent.click(headerCheckbox);
+    }
+
+    // 畫面應有 3 個下拉選單對應 3 個欄位
+    const mappingSelects = screen.getAllByRole('combobox');
+    expect(mappingSelects.length).toBeGreaterThanOrEqual(3);
+
+    // 第 1 欄選擇「評分」
+    fireEvent.change(mappingSelects[0]!, { target: { value: 'score' } });
+    // 第 2 欄選擇「略過此欄 (不匯入)」
+    fireEvent.change(mappingSelects[1]!, { target: { value: '' } });
+    // 第 3 欄選擇「姓名」
+    fireEvent.change(mappingSelects[2]!, { target: { value: 'name' } });
+
+    // 點擊確認匯入
+    const confirmBtn = screen.getByText(/確認匯入 2 筆/);
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(handlePasteImport).toHaveBeenCalledWith([
+        { score: 98, name: '陳專員' },
+        { score: 77, name: '林組長' },
+      ]);
+    });
+  });
 });
