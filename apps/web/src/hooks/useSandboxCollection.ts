@@ -263,13 +263,76 @@ export function useSandboxCollection<T extends Record<string, any>>(collectionNa
     [collectionName, data]
   );
 
+  const insertMany = useCallback(
+    async (payloads: T[]): Promise<string[]> => {
+      if (!payloads.length) return [];
+      const now = new Date().toISOString();
+      const docs: SandboxDocument<T>[] = payloads.map((payload) => ({
+        id: generateId(),
+        collection: collectionName,
+        payload,
+        createdAt: now,
+        updatedAt: now,
+      }));
+
+      await sandboxDb.documents.bulkPut(docs);
+      await refresh();
+
+      // 背景平行同步至雲端 D1
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        Promise.all(
+          docs.map((doc) =>
+            fetch(`/api/sandbox/${encodeURIComponent(collectionName)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: doc.id,
+                payload: doc.payload,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+              }),
+            }).catch(() => {})
+          )
+        ).catch(() => {});
+      }
+
+      return docs.map((d) => d.id);
+    },
+    [collectionName, refresh]
+  );
+
+  const removeMany = useCallback(
+    async (ids: string[]): Promise<void> => {
+      if (!ids.length) return;
+      await sandboxDb.documents.bulkDelete(ids);
+      await refresh();
+
+      // 背景平行自雲端 D1 刪除
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        Promise.all(
+          ids.map((id) =>
+            fetch(
+              `/api/sandbox/${encodeURIComponent(collectionName)}?id=${encodeURIComponent(id)}`,
+              {
+                method: 'DELETE',
+              }
+            ).catch(() => {})
+          )
+        ).catch(() => {});
+      }
+    },
+    [collectionName, refresh]
+  );
+
   return {
     data,
     isLoading,
     error,
     insert,
+    insertMany,
     update,
     remove,
+    removeMany,
     refresh,
     exportCSV,
   };

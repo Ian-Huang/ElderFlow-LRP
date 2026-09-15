@@ -123,28 +123,33 @@ export function VisitorAuditPrintView() {
                       {rec.visitorType}
                     </td>
                     <td className="border border-black px-2 py-2 font-bold text-left">
-                      {rec.name}
+                      {rec.name || '—'}
                       {rec.isGroup && <span className="font-normal text-[10px]"> (等同行)</span>}
                     </td>
-                    <td className="border border-black px-1 py-2 font-mono">{rec.phone}</td>
+                    <td className="border border-black px-1 py-2 font-mono">{rec.phone || '—'}</td>
                     <td className="border border-black px-1 py-2 font-bold font-mono">
-                      {rec.temperature}
+                      {rec.temperature || '—'}
                     </td>
                     <td className="border border-black px-2 py-2 text-left">
                       {rec.visitorType === '志工服務' && (
                         <span>
-                          [{rec.serviceUnit}] {rec.servicePurpose}
+                          [{rec.serviceUnit || '個人志工'}] {rec.servicePurpose || '陪伴服務'}
                           {rec.companionNames && ` (同行人員: ${rec.companionNames})`}
+                          {rec.notes && ` [備註: ${rec.notes}]`}
                         </span>
                       )}
                       {rec.visitorType === '住民家屬' && (
                         <span>
-                          探訪長者：{rec.residentName} ({rec.relationship})
+                          探訪長者：{rec.residentName || '—'}
+                          {rec.residentBed && ` (${rec.residentBed}床)`}
+                          {rec.relationship && ` [${rec.relationship}]`}
+                          {rec.notes && ` [備註: ${rec.notes}]`}
                         </span>
                       )}
                       {rec.visitorType === '機構洽公' && (
                         <span>
-                          {rec.organization} - {rec.officialPurpose}
+                          {rec.organization || '洽公單位'} - {rec.officialPurpose || '公務接洽'}
+                          {rec.notes && ` [備註: ${rec.notes}]`}
                         </span>
                       )}
                     </td>

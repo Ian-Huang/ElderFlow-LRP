@@ -89,4 +89,45 @@ describe('useSandboxCollection Hook', () => {
 
     expect(result.current.data.length).toBe(0);
   });
+
+  it('應可批次新增多筆資料 (insertMany)', async () => {
+    const { result } = renderHook(() => useSandboxCollection<VisitorPayload>('test_visitors'));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      const ids = await result.current.insertMany([
+        { name: '訪客A', temperature: 36.2, type: '志工服務' },
+        { name: '訪客B', temperature: 36.6, type: '住民家屬' },
+        { name: '訪客C', temperature: 36.8, type: '機構洽公' },
+      ]);
+      expect(ids.length).toBe(3);
+    });
+
+    expect(result.current.data.length).toBe(3);
+  });
+
+  it('應可批次刪除多筆資料 (removeMany)', async () => {
+    const { result } = renderHook(() => useSandboxCollection<VisitorPayload>('test_visitors'));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let ids: string[] = [];
+    await act(async () => {
+      ids = await result.current.insertMany([
+        { name: '刪除A', temperature: 36.2, type: '志工服務' },
+        { name: '保留B', temperature: 36.6, type: '住民家屬' },
+        { name: '刪除C', temperature: 36.8, type: '機構洽公' },
+      ]);
+    });
+
+    expect(result.current.data.length).toBe(3);
+
+    await act(async () => {
+      await result.current.removeMany([ids[0]!, ids[2]!]);
+    });
+
+    expect(result.current.data.length).toBe(1);
+    expect(result.current.data[0]?.name).toBe('保留B');
+  });
 });

@@ -20,9 +20,16 @@ export interface VisitorRecord {
   residentName?: string;
   residentBed?: string;
   relationship?: string;
+  isRegisteredFamily?: string; // 是否為登記家屬 (是 / 否)
   // 洽公專用欄位
   organization?: string;
   officialPurpose?: string;
+  // 臨床防疫與停留紀錄 (對齊 Google Sheet 歷史紀錄)
+  tocc?: string; // TOCC (旅遊史/職業史/接觸史/群聚史)
+  healthMeasures?: string; // 健康管理措施 (量體溫、已洗手、已戴口罩)
+  notes?: string; // 備註
+  estimatedDuration?: string; // 預計停留時間
+  estimatedLeaveTime?: string; // 預計離開時間
 }
 
 const COMMON_UNITS = [
